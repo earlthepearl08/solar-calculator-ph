@@ -15,7 +15,12 @@
 </head>
 
 <body>
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
     <div class="app-container">
+        <!-- Mobile Toggle Button -->
+        <button class="mobile-toggle" id="mobileToggle" aria-label="Toggle sidebar">
+            ⚙️
+        </button>
         <!-- Sidebar -->
         <aside class="sidebar">
             <div class="sidebar-header">
@@ -27,7 +32,10 @@
 
             <div class="sidebar-content">
                 <div class="input-group">
-                    <label for="projectScale">Project Scale</label>
+                    <label for="projectScale">
+                        Project Scale
+                        <span class="tooltip-icon" data-tooltip="Choose the category that best fits your energy needs">ⓘ</span>
+                    </label>
                     <select id="projectScale">
                         <option value="Residential">Residential (up to 20kWp)</option>
                         <option value="C&I">C&I (21-300kWp)</option>
@@ -36,7 +44,10 @@
                 </div>
 
                 <div class="input-group">
-                    <label for="systemType">System Type</label>
+                    <label for="systemType">
+                        System Type
+                        <span class="tooltip-icon" data-tooltip="Grid-Tied: Connected to utility grid | Hybrid: Grid + Battery | Off-Grid: Fully independent">ⓘ</span>
+                    </label>
                     <select id="systemType">
                         <option value="Grid-Tied">Grid-Tied</option>
                         <option value="Hybrid">Hybrid</option>
@@ -75,7 +86,10 @@
                 </div>
 
                 <div class="input-group">
-                    <label for="wattage">PV Module Wattage (Wp)</label>
+                    <label for="wattage">
+                        PV Module Wattage (Wp)
+                        <span class="tooltip-icon" data-tooltip="Power rating of each solar panel. Modern panels typically range from 400-700W">ⓘ</span>
+                    </label>
                     <input type="number" id="wattage" value="620" step="10" min="100">
                 </div>
 

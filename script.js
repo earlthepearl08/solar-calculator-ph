@@ -1,4 +1,32 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // Animated Counter Function
+    function animateValue(element, start, end, duration = 800, suffix = '') {
+        if (!element) return;
+
+        const startTime = performance.now();
+        const range = end - start;
+
+        function update(currentTime) {
+            const elapsed = currentTime - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+
+            // Easing function for smooth animation
+            const easeOutQuart = 1 - Math.pow(1 - progress, 4);
+            const current = start + (range * easeOutQuart);
+
+            element.textContent = current.toFixed(end < 10 ? 2 : 1) + suffix;
+            element.classList.add('updating');
+
+            if (progress < 1) {
+                requestAnimationFrame(update);
+            } else {
+                setTimeout(() => element.classList.remove('updating'), 300);
+            }
+        }
+
+        requestAnimationFrame(update);
+    }
+
     // DOM Elements
     const elements = {
         projectScale: document.getElementById('projectScale'),
@@ -113,9 +141,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const displayKwp = (displayPanels * wattage) / 1000;
         const displayArea = displayPanels * PANEL_SIZE_SQM;
 
-        elements.resCapacity.textContent = displayKwp.toFixed(2) + " kWp";
-        elements.resPanels.textContent = displayPanels;
-        elements.resArea.textContent = displayArea.toFixed(1) + " m²";
+        // Animate metric values
+        const prevCapacity = parseFloat(elements.resCapacity.textContent) || 0;
+        const prevPanels = parseFloat(elements.resPanels.textContent) || 0;
+        const prevArea = parseFloat(elements.resArea.textContent) || 0;
+
+        animateValue(elements.resCapacity, prevCapacity, displayKwp, 800, " kWp");
+        animateValue(elements.resPanels, prevPanels, displayPanels, 800, "");
+        animateValue(elements.resArea, prevArea, displayArea, 800, " m²");
 
         // Production Details
         const effectiveDailySolarKwh = displayKwp * PSH * EFFICIENCY;
@@ -144,7 +177,8 @@ document.addEventListener('DOMContentLoaded', () => {
             elements.resStorageCard.classList.add('hidden');
         } else {
             elements.resStorageCard.classList.remove('hidden');
-            elements.resStorage.textContent = batteryCapacityTotal.toFixed(1) + " kWh";
+            const prevStorage = parseFloat(elements.resStorage.textContent) || 0;
+            animateValue(elements.resStorage, prevStorage, batteryCapacityTotal, 800, " kWh");
         }
 
         // Scenario 1
@@ -305,6 +339,60 @@ document.addEventListener('DOMContentLoaded', () => {
             calculate();
         });
     });
+
+    // Update range slider backgrounds dynamically
+    function updateRangeBackground(rangeInput) {
+        const value = ((rangeInput.value - rangeInput.min) / (rangeInput.max - rangeInput.min)) * 100;
+        rangeInput.style.background = `linear-gradient(to right, #667eea 0%, #764ba2 ${value}%, rgba(255,255,255,0.1) ${value}%, rgba(255,255,255,0.1) 100%)`;
+    }
+
+    // Initialize range sliders with proper backgrounds
+    document.querySelectorAll('input[type="range"]').forEach(slider => {
+        updateRangeBackground(slider);
+        slider.addEventListener('input', (e) => {
+            updateRangeBackground(e.target);
+        });
+    });
+
+    // Add input focus animations
+    document.querySelectorAll('.sidebar input, .sidebar select').forEach(input => {
+        input.addEventListener('focus', () => {
+            input.parentElement.classList.add('focused');
+        });
+        input.addEventListener('blur', () => {
+            input.parentElement.classList.remove('focused');
+        });
+    });
+
+    // Mobile Sidebar Toggle
+    const mobileToggle = document.getElementById('mobileToggle');
+    const sidebar = document.querySelector('.sidebar');
+    const sidebarOverlay = document.getElementById('sidebarOverlay');
+
+    if (mobileToggle && sidebar && sidebarOverlay) {
+        mobileToggle.addEventListener('click', () => {
+            sidebar.classList.toggle('active');
+            sidebarOverlay.classList.toggle('active');
+            document.body.style.overflow = sidebar.classList.contains('active') ? 'hidden' : '';
+        });
+
+        sidebarOverlay.addEventListener('click', () => {
+            sidebar.classList.remove('active');
+            sidebarOverlay.classList.remove('active');
+            document.body.style.overflow = '';
+        });
+
+        // Close sidebar when clicking on input elements (after interaction)
+        sidebar.addEventListener('change', (e) => {
+            if (window.innerWidth <= 900 && (e.target.tagName === 'SELECT' || e.target.tagName === 'INPUT')) {
+                setTimeout(() => {
+                    sidebar.classList.remove('active');
+                    sidebarOverlay.classList.remove('active');
+                    document.body.style.overflow = '';
+                }, 300);
+            }
+        });
+    }
 
     // Initial setup
     updateBatteryOptions();
