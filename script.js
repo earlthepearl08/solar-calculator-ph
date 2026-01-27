@@ -80,7 +80,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const batteryOptionsMap = {
         'Residential': { '5kWh': 5, '10kWh': 10, '15kWh': 15 },
-        'C&I': { '15kWh': 15, '100kWh': 100, '215kWh': 215, '1MWh': 1000 },
+        'C&I': { '100kWh': 100, '215kWh': 215, '1MWh': 1000 },
         'Utility Scale': { '215kWh': 215, '1MWh': 1000 }
     };
 
