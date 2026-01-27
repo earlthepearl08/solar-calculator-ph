@@ -66,7 +66,7 @@
                 <div class="input-group">
                     <label for="rate">Avg. Monthly Rate (PHP/kWh)</label>
                     <div class="number-input-wrapper">
-                        <input type="number" id="rate" value="12.5" step="0.1" min="1">
+                        <input type="number" id="rate" value="13.5" step="0.1" min="1">
                         <button class="clear-input" data-target="rate">×</button>
                     </div>
                 </div>
@@ -93,10 +93,29 @@
                     <input type="number" id="wattage" value="620" step="10" min="100">
                 </div>
 
-                <div class="input-group">
+                <div class="input-group" id="daytimeLoadGroup">
                     <label for="daytimeLoad">Daytime Load Split <span id="daytimeLoadVal">30</span>%</label>
                     <input type="range" id="daytimeLoad" min="0" max="100" value="30">
                     <small class="help-text">Percentage of usage during sun hours (8am-4pm).</small>
+                </div>
+
+                <div class="input-group hidden" id="shiftGroup">
+                    <label>Operating Shifts</label>
+                    <div class="shift-selector">
+                        <div class="shift-option active" data-shift="1">
+                            1 Shift
+                            <small>8 hours</small>
+                        </div>
+                        <div class="shift-option" data-shift="2">
+                            2 Shifts
+                            <small>16 hours</small>
+                        </div>
+                        <div class="shift-option" data-shift="3">
+                            3 Shifts
+                            <small>24 hours</small>
+                        </div>
+                    </div>
+                    <small class="help-text">1 shift typically starts at 6am. Percentages account for peak sun hours (8am-4pm) plus extended generation during late afternoon that continues post-shift.</small>
                 </div>
 
                 <div class="info-panel panel-size">

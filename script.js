@@ -39,6 +39,8 @@ document.addEventListener('DOMContentLoaded', () => {
         wattage: document.getElementById('wattage'),
         daytimeLoad: document.getElementById('daytimeLoad'),
         daytimeLoadVal: document.getElementById('daytimeLoadVal'),
+        daytimeLoadGroup: document.getElementById('daytimeLoadGroup'),
+        shiftGroup: document.getElementById('shiftGroup'),
         batterySection: document.getElementById('batterySection'),
         backupHours: document.getElementById('backupHours'),
         backupHoursVal: document.getElementById('backupHoursVal'),
@@ -72,6 +74,9 @@ document.addEventListener('DOMContentLoaded', () => {
         detConfigContent: document.getElementById('detConfigContent'),
         statusAlerts: document.getElementById('statusAlerts')
     };
+
+    // Current shift selection (for C&I and Utility Scale)
+    let currentShift = 1;
 
     const batteryOptionsMap = {
         'Residential': { '5kWh': 5, '10kWh': 10, '15kWh': 15 },
@@ -110,7 +115,29 @@ document.addEventListener('DOMContentLoaded', () => {
         const solarTargetPct = type === 'Off-Grid' ? 100 : parseInt(elements.solarTarget.value);
         const area = parseFloat(elements.area.value) || 0;
         const wattage = parseFloat(elements.wattage.value) || 620;
-        const daytimeLoadPct = parseInt(elements.daytimeLoad.value);
+
+        // Calculate daytime load percentage based on project scale
+        let daytimeLoadPct;
+        if (scale === 'Residential') {
+            daytimeLoadPct = parseInt(elements.daytimeLoad.value);
+        } else {
+            // For C&I and Utility Scale, convert shifts to daytime percentage
+            // Peak sun hours: 8am-4pm (8 hours), with extended generation until ~6pm
+            // 1 shift = 8 hours starting at 6am (6am-2pm) = ~85% overlap
+            //   (Most of shift during peak sun + spillover generation continues post-shift)
+            // 2 shifts = 16 hours (6am-10pm) = ~55% daytime coverage
+            //   (8 peak hours + 2 hours spillover generation / 16 hours)
+            // 3 shifts = 24 hours = ~40% daytime coverage
+            //   (8 peak hours + 2 hours spillover / 24 hours)
+            // Note: Solar panels continue generating for ~2 hours after shift ends during late afternoon
+            const shiftToDaytimeMap = {
+                1: 85,  // 1 shift: peak daytime coverage + spillover
+                2: 55,  // 2 shifts: moderate daytime coverage
+                3: 40   // 3 shifts: 24/7 operation with extended generation
+            };
+            daytimeLoadPct = shiftToDaytimeMap[currentShift] || 55;
+        }
+
         const backupHours = parseInt(elements.backupHours.value);
         const batteryUnitKwh = parseFloat(elements.batteryUnit.value) || 0;
         const enableNetMetering = elements.enableNetMetering.checked;
@@ -300,6 +327,15 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     elements.projectScale.addEventListener('change', () => {
+        const scale = elements.projectScale.value;
+        // Toggle between daytime load and shift selector
+        if (scale === 'Residential') {
+            elements.daytimeLoadGroup.classList.remove('hidden');
+            elements.shiftGroup.classList.add('hidden');
+        } else {
+            elements.daytimeLoadGroup.classList.add('hidden');
+            elements.shiftGroup.classList.remove('hidden');
+        }
         updateBatteryOptions();
         calculate();
     });
@@ -336,6 +372,20 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.addEventListener('click', (e) => {
             const targetId = e.target.getAttribute('data-target');
             elements[targetId].value = '';
+            calculate();
+        });
+    });
+
+    // Shift selector event listeners
+    document.querySelectorAll('.shift-option').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const shiftValue = parseInt(e.currentTarget.getAttribute('data-shift'));
+            currentShift = shiftValue;
+
+            // Update active state
+            document.querySelectorAll('.shift-option').forEach(opt => opt.classList.remove('active'));
+            e.currentTarget.classList.add('active');
+
             calculate();
         });
     });
