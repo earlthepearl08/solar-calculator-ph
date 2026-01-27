@@ -93,6 +93,38 @@ document.addEventListener('DOMContentLoaded', () => {
         return '₱ ' + val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
+    // Find optimal battery configuration
+    // Returns: { unitKwh, numUnits, totalKwh, label }
+    function findOptimalBattery(requiredKwh, scale) {
+        const options = batteryOptionsMap[scale];
+        if (!options || requiredKwh <= 0) {
+            return { unitKwh: 0, numUnits: 0, totalKwh: 0, label: '' };
+        }
+
+        let bestOption = null;
+        let smallestTotal = Infinity;
+
+        // Try each battery size
+        for (const [label, unitKwh] of Object.entries(options)) {
+            const numUnits = Math.ceil(requiredKwh / unitKwh);
+            const totalKwh = numUnits * unitKwh;
+
+            // Prefer smallest total capacity
+            // If tied, prefer fewer larger units (which is automatic since we iterate small to large)
+            if (totalKwh < smallestTotal) {
+                smallestTotal = totalKwh;
+                bestOption = { unitKwh, numUnits, totalKwh, label };
+            } else if (totalKwh === smallestTotal && bestOption) {
+                // If same total, prefer fewer units (larger unit size)
+                if (numUnits < bestOption.numUnits) {
+                    bestOption = { unitKwh, numUnits, totalKwh, label };
+                }
+            }
+        }
+
+        return bestOption || { unitKwh: 0, numUnits: 0, totalKwh: 0, label: '' };
+    }
+
     function updateBatteryOptions() {
         const scale = elements.projectScale.value;
         const options = batteryOptionsMap[scale];
@@ -185,18 +217,20 @@ document.addEventListener('DOMContentLoaded', () => {
         const directConsumedKwh = Math.min(effectiveDailySolarKwh, daytimeLoadKwh);
         const surplusSolarKwh = Math.max(0, effectiveDailySolarKwh - daytimeLoadKwh);
 
-        // Battery Logic
+        // Battery Logic - Find optimal battery configuration
         const avgHourlyLoad = dailyKwh / 24;
         const backupStorageNeeded = avgHourlyLoad * backupHours;
-        
-        let numBatt = 0;
+
+        let optimalBattery;
         if (type === 'Hybrid' || type === 'Off-Grid') {
-            numBatt = batteryUnitKwh > 0 ? Math.ceil(backupStorageNeeded / batteryUnitKwh) : 0;
+            optimalBattery = findOptimalBattery(backupStorageNeeded, scale);
         } else {
-            numBatt = batteryUnitKwh > 0 ? Math.ceil(surplusSolarKwh / batteryUnitKwh) : 1;
+            optimalBattery = findOptimalBattery(surplusSolarKwh, scale);
         }
 
-        const batteryCapacityTotal = numBatt * batteryUnitKwh;
+        const numBatt = optimalBattery.numUnits;
+        const batteryCapacityTotal = optimalBattery.totalKwh;
+        const batteryUnitLabel = optimalBattery.label;
         const usableBatteryKwh = batteryCapacityTotal * 0.9;
         const batteryShiftedKwh = Math.min(surplusSolarKwh, usableBatteryKwh, nighttimeLoadKwh);
 
@@ -269,12 +303,11 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.detMonthlyReq.textContent = monthlyKwh.toFixed(1) + " kWh";
 
         // Battery assessment box
-        const batteryUnitLabel = elements.batteryUnit.options[elements.batteryUnit.selectedIndex]?.text || '';
         if (type === 'Grid-Tied') {
             elements.detConfigTitle.textContent = "Battery Recommendation";
             if (surplusSolarKwh > 0) {
-                const suggest = batteryUnitKwh > 0 ? Math.ceil(surplusSolarKwh / batteryUnitKwh) : 1;
-                elements.detConfigContent.innerHTML = `<p style="color:var(--text-muted); font-size:0.9rem;">Adding <strong>${suggest}x ${batteryUnitLabel}</strong> unit(s) would allow you to capture surplus solar and shift to nighttime savings.</p>`;
+                const suggestedBattery = findOptimalBattery(surplusSolarKwh, scale);
+                elements.detConfigContent.innerHTML = `<p style="color:var(--text-muted); font-size:0.9rem;">Adding <strong>${suggestedBattery.numUnits}x ${suggestedBattery.label}</strong> (${suggestedBattery.totalKwh.toFixed(1)} kWh total) would allow you to capture surplus solar and shift to nighttime savings.</p>`;
             } else {
                 elements.detConfigContent.innerHTML = `<p style="color:var(--success-color); font-weight:600;">Your daytime load consumes all solar. Battery is optional for backup only.</p>`;
             }
@@ -284,6 +317,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <ul style="list-style:none; font-size:0.9rem; color:var(--text-muted);">
                     <li>Target Backup: <strong>${backupHours} hours</strong></li>
                     <li>Total Battery Units: <strong>${numBatt}x ${batteryUnitLabel}</strong></li>
+                    <li>Total Capacity: <strong>${batteryCapacityTotal.toFixed(1)} kWh</strong></li>
                 </ul>
             `;
         }
@@ -320,9 +354,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Event Listeners
-    [elements.projectScale, elements.systemType, elements.bill, elements.rate, elements.solarTarget, 
-     elements.area, elements.wattage, elements.daytimeLoad, elements.backupHours, 
-     elements.batteryUnit, elements.enableNetMetering, elements.genCharge].forEach(el => {
+    [elements.projectScale, elements.systemType, elements.bill, elements.rate, elements.solarTarget,
+     elements.area, elements.wattage, elements.daytimeLoad, elements.backupHours,
+     elements.enableNetMetering, elements.genCharge].forEach(el => {
         el.addEventListener('input', calculate);
     });
 
