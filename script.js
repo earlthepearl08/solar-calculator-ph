@@ -1,4 +1,17 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // ==================== EMAILJS CONFIGURATION ====================
+    const EMAILJS_CONFIG = {
+        publicKey: '4b7a3sQV-LmDcToos',
+        serviceId: 'service_sx1yj4d',
+        customerTemplateId: 'template_4ogepjc',
+        notifyTemplateId: 'template_4ogepjc'
+    };
+
+    // Initialize EmailJS
+    if (window.emailjs && EMAILJS_CONFIG.publicKey !== 'YOUR_PUBLIC_KEY') {
+        emailjs.init(EMAILJS_CONFIG.publicKey);
+    }
+
     // Animated Counter Function
     function animateValue(element, start, end, duration = 800, suffix = '') {
         if (!element) return;
@@ -54,6 +67,9 @@ document.addEventListener('DOMContentLoaded', () => {
         resArea: document.getElementById('resArea'),
         resStorage: document.getElementById('resStorage'),
         resStorageCard: document.getElementById('resStorageCard'),
+        resSystemCost: document.getElementById('resSystemCost'),
+        resPayback: document.getElementById('resPayback'),
+        resROI: document.getElementById('resROI'),
         sc1Monthly: document.getElementById('sc1Monthly'),
         sc1Offset: document.getElementById('sc1Offset'),
         sc1Yearly: document.getElementById('sc1Yearly'),
@@ -88,9 +104,39 @@ document.addEventListener('DOMContentLoaded', () => {
     const PSH = 4.0;
     const EFFICIENCY = 0.80;
     const PANEL_SIZE_SQM = 3.0;
+    const SYSTEM_LIFESPAN_YEARS = 15;
+
+    // Cost per kWp by project scale and capacity
+    // Residential: ₱45,000/kWp
+    // C&I 21-100kWp: ₱42,000/kWp
+    // C&I 100-300kWp: ₱38,500/kWp
+    // Utility Scale (300kWp+): ₱35,000/kWp
+    function getCostPerKwp(scale, capacityKwp) {
+        if (scale === 'Residential') {
+            return 45000;
+        } else if (scale === 'C&I') {
+            if (capacityKwp <= 100) {
+                return 42000;
+            } else {
+                return 38500;
+            }
+        } else {
+            // Utility Scale (>300kWp)
+            return 35000;
+        }
+    }
 
     function formatPHP(val) {
         return '₱ ' + val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function formatPHPShort(val) {
+        if (val >= 1000000) {
+            return '₱' + (val / 1000000).toFixed(2) + 'M';
+        } else if (val >= 1000) {
+            return '₱' + (val / 1000).toFixed(0) + 'K';
+        }
+        return '₱' + val.toFixed(0);
     }
 
     // Find optimal battery configuration
@@ -171,7 +217,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const backupHours = parseInt(elements.backupHours.value);
-        const batteryUnitKwh = parseFloat(elements.batteryUnit.value) || 0;
         const enableNetMetering = elements.enableNetMetering.checked;
         const genChargeRate = parseFloat(elements.genCharge.value) || 0;
 
@@ -296,6 +341,46 @@ document.addEventListener('DOMContentLoaded', () => {
             elements.sc2Yearly.textContent = "Est. " + formatPHP(c2MonthlySavings * 12).split('.')[0] + " / year";
         }
 
+        // ROI and Payback Period Calculation
+        const costPerKwp = getCostPerKwp(scale, displayKwp);
+        const estimatedSystemCost = displayKwp * costPerKwp;
+        const annualSavings = c1MonthlySavings * 12;
+        const paybackYears = annualSavings > 0 ? estimatedSystemCost / annualSavings : 0;
+        const totalLifetimeSavings = annualSavings * SYSTEM_LIFESPAN_YEARS;
+        const roi = estimatedSystemCost > 0 ? ((totalLifetimeSavings - estimatedSystemCost) / estimatedSystemCost * 100) : 0;
+
+        // Update ROI display
+        if (elements.resSystemCost) {
+            elements.resSystemCost.textContent = formatPHPShort(estimatedSystemCost);
+        }
+        if (elements.resPayback) {
+            elements.resPayback.textContent = paybackYears > 0 ? paybackYears.toFixed(1) + " years" : "N/A";
+        }
+        if (elements.resROI) {
+            elements.resROI.textContent = roi > 0 ? roi.toFixed(0) + "%" : "N/A";
+        }
+
+        // Store calculation results for PDF report
+        window.solarCalcResults = {
+            scale,
+            type,
+            systemCapacity: displayKwp,
+            numPanels: displayPanels,
+            areaUsed: displayArea,
+            monthlyBill: bill,
+            rate,
+            monthlyGeneration: effectiveDailySolarKwh * 30,
+            monthlySavings: c1MonthlySavings,
+            annualSavings,
+            billOffset: Math.min(c1Offset, 100),
+            estimatedSystemCost,
+            costPerKwp,
+            paybackYears,
+            roi,
+            lifetimeSavings: totalLifetimeSavings,
+            batteryConfig: type !== 'Grid-Tied' ? `${numBatt}x ${batteryUnitLabel}` : 'None'
+        };
+
         // Details
         elements.detMonthlyGen.textContent = (effectiveDailySolarKwh * 30).toFixed(1) + " kWh";
         elements.detDirectCons.textContent = (directConsumedKwh * 30).toFixed(1) + " kWh";
@@ -334,8 +419,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (scale !== actualCat) {
             const alert = document.createElement('div');
             alert.className = 'info-box';
-            alert.style.backgroundColor = 'white';
-            alert.style.color = 'var(--primary-color)';
+            alert.style.backgroundColor = 'var(--card-bg)';
+            alert.style.color = 'var(--text-muted)';
             alert.style.border = '1px solid var(--border-color)';
             alert.style.marginBottom = '1rem';
             alert.innerHTML = `Note: System sized as <strong>${actualCat}</strong> (${displayKwp.toFixed(1)} kWp). Consider aligning Project Scale for optimized options.`;
@@ -466,14 +551,118 @@ document.addEventListener('DOMContentLoaded', () => {
             document.body.style.overflow = '';
         });
 
-        // Close sidebar when clicking on input elements (after interaction)
-        sidebar.addEventListener('change', (e) => {
-            if (window.innerWidth <= 900 && (e.target.tagName === 'SELECT' || e.target.tagName === 'INPUT')) {
-                setTimeout(() => {
-                    sidebar.classList.remove('active');
-                    sidebarOverlay.classList.remove('active');
-                    document.body.style.overflow = '';
-                }, 300);
+        // Sidebar stays open while adjusting settings
+        // User can close by tapping overlay or toggle button
+    }
+
+    // ==================== REPORT MODAL & PDF GENERATION ====================
+    const reportModal = document.getElementById('reportModal');
+    const btnGetReport = document.getElementById('btnGetReport');
+    const modalClose = document.getElementById('modalClose');
+    const reportForm = document.getElementById('reportForm');
+    const reportSuccess = document.getElementById('reportSuccess');
+    const btnCloseSuccess = document.getElementById('btnCloseSuccess');
+    const btnSubmitText = document.getElementById('btnSubmitText');
+    const btnSubmitLoading = document.getElementById('btnSubmitLoading');
+
+    // Open modal
+    if (btnGetReport) {
+        btnGetReport.addEventListener('click', () => {
+            reportModal.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        });
+    }
+
+    // Close modal
+    function closeModal() {
+        reportModal.classList.remove('active');
+        document.body.style.overflow = '';
+        // Reset form state
+        reportForm.classList.remove('hidden');
+        reportSuccess.classList.add('hidden');
+        reportForm.reset();
+    }
+
+    if (modalClose) {
+        modalClose.addEventListener('click', closeModal);
+    }
+
+    if (btnCloseSuccess) {
+        btnCloseSuccess.addEventListener('click', closeModal);
+    }
+
+    // Close on overlay click
+    reportModal?.addEventListener('click', (e) => {
+        if (e.target === reportModal) {
+            closeModal();
+        }
+    });
+
+    // Handle form submission
+    if (reportForm) {
+        reportForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const customerInfo = {
+                name: document.getElementById('customerName').value,
+                email: document.getElementById('customerEmail').value,
+                phone: document.getElementById('customerPhone').value,
+                location: document.getElementById('customerLocation').value
+            };
+
+            // Show loading state
+            btnSubmitText.classList.add('hidden');
+            btnSubmitLoading.classList.remove('hidden');
+            document.getElementById('btnSubmitReport').disabled = true;
+
+            try {
+                const results = window.solarCalcResults || {};
+
+                // Prepare email template parameters (no PDF attachment)
+                const templateParams = {
+                    to_name: customerInfo.name,
+                    to_email: customerInfo.email,
+                    customer_phone: customerInfo.phone || 'Not provided',
+                    customer_location: customerInfo.location || 'Not provided',
+                    system_capacity: (results.systemCapacity || 0).toFixed(2) + ' kWp',
+                    num_panels: results.numPanels || 0,
+                    system_type: results.type || 'N/A',
+                    project_scale: results.scale || 'N/A',
+                    monthly_savings: formatPHP(results.monthlySavings || 0),
+                    annual_savings: formatPHP(results.annualSavings || 0),
+                    bill_offset: (results.billOffset || 0).toFixed(1) + '%',
+                    system_cost: formatPHP(results.estimatedSystemCost || 0),
+                    payback_years: (results.paybackYears || 0).toFixed(1),
+                    roi: (results.roi || 0).toFixed(0) + '%',
+                    battery_config: results.batteryConfig || 'None'
+                };
+
+                // Check if EmailJS is configured
+                if (window.emailjs && EMAILJS_CONFIG.publicKey !== 'YOUR_PUBLIC_KEY') {
+                    // Send email to customer
+                    await emailjs.send(
+                        EMAILJS_CONFIG.serviceId,
+                        EMAILJS_CONFIG.customerTemplateId,
+                        templateParams
+                    );
+                } else {
+                    // Fallback if EmailJS not configured
+                    console.warn('EmailJS not configured.');
+                    pdf.save('Solar_Feasibility_Report_' + customerInfo.name.replace(/\s+/g, '_') + '.pdf');
+                }
+
+                // Show success state
+                reportForm.classList.add('hidden');
+                reportSuccess.classList.remove('hidden');
+
+            } catch (error) {
+                console.error('Error sending report:', error);
+                alert('Error sending report. Please try again or contact support.');
+            } finally {
+                // Reset button state
+                btnSubmitText.classList.remove('hidden');
+                btnSubmitLoading.classList.add('hidden');
+                document.getElementById('btnSubmitReport').disabled = false;
             }
         });
     }

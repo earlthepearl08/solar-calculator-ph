@@ -94,8 +94,8 @@
                 </div>
 
                 <div class="input-group" id="daytimeLoadGroup">
-                    <label for="daytimeLoad">Daytime Load Split <span id="daytimeLoadVal">30</span>%</label>
-                    <input type="range" id="daytimeLoad" min="0" max="100" value="30">
+                    <label for="daytimeLoad">Daytime Load Split <span id="daytimeLoadVal">40</span>%</label>
+                    <input type="range" id="daytimeLoad" min="0" max="100" value="40">
                     <small class="help-text">Percentage of usage during sun hours (8am-4pm).</small>
                 </div>
 
@@ -198,6 +198,26 @@
                 </div>
             </div>
 
+            <!-- Investment Analysis -->
+            <section class="roi-section">
+                <h3>Investment Analysis</h3>
+                <div class="metrics-grid roi-grid">
+                    <div class="metric-card roi-card">
+                        <span class="metric-label">Est. System Cost</span>
+                        <span class="metric-value" id="resSystemCost">₱0</span>
+                    </div>
+                    <div class="metric-card roi-card">
+                        <span class="metric-label">Payback Period</span>
+                        <span class="metric-value" id="resPayback">0 years</span>
+                    </div>
+                    <div class="metric-card roi-card highlight">
+                        <span class="metric-label">15-Year ROI</span>
+                        <span class="metric-value" id="resROI">0%</span>
+                    </div>
+                </div>
+                <p class="roi-disclaimer">* Estimates based on current electricity rates. Actual payback and ROI may vary due to economic changes, system costs, and installation factors. Contact us for a detailed quotation.</p>
+            </section>
+
             <section class="analysis-section">
                 <h3>Savings and Offset Analysis</h3>
                 <div class="results-grid">
@@ -252,6 +272,17 @@
                 </div>
             </section>
 
+            <!-- Get Custom Report CTA -->
+            <section class="report-cta-section">
+                <div class="report-cta-box">
+                    <h3>Get Your Custom Solar Report</h3>
+                    <p>Receive a professional PDF summary of your solar feasibility analysis, including detailed ROI projections and system specifications.</p>
+                    <button class="btn-report" id="btnGetReport">
+                        Get Your Custom Report
+                    </button>
+                </div>
+            </section>
+
             <footer class="app-footer">
                 <h3>Contact Us</h3>
                 <p>For professional installation and detailed assessments:</p>
@@ -268,6 +299,48 @@
             </footer>
         </main>
     </div>
+
+    <!-- Report Request Modal -->
+    <div class="modal-overlay" id="reportModal">
+        <div class="modal-content">
+            <button class="modal-close" id="modalClose">&times;</button>
+            <h3>Get Your Custom Solar Report</h3>
+            <p>Enter your details below and we'll send you a professional PDF summary of your solar feasibility analysis.</p>
+            <form id="reportForm">
+                <div class="form-group">
+                    <label for="customerName">Full Name *</label>
+                    <input type="text" id="customerName" name="customerName" required placeholder="Juan Dela Cruz">
+                </div>
+                <div class="form-group">
+                    <label for="customerEmail">Email Address *</label>
+                    <input type="email" id="customerEmail" name="customerEmail" required placeholder="juan@example.com">
+                </div>
+                <div class="form-group">
+                    <label for="customerPhone">Phone Number</label>
+                    <input type="tel" id="customerPhone" name="customerPhone" placeholder="09XX XXX XXXX">
+                </div>
+                <div class="form-group">
+                    <label for="customerLocation">Location / City</label>
+                    <input type="text" id="customerLocation" name="customerLocation" placeholder="Manila, Philippines">
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-submit" id="btnSubmitReport">
+                        <span id="btnSubmitText">Send My Report</span>
+                        <span id="btnSubmitLoading" class="hidden">Generating...</span>
+                    </button>
+                </div>
+                <p class="form-disclaimer">By submitting, you agree to be contacted by Kinmo PW regarding your solar inquiry.</p>
+            </form>
+            <div id="reportSuccess" class="hidden">
+                <div class="success-icon">&#10004;</div>
+                <h4>Report Sent Successfully!</h4>
+                <p>Check your email for your custom solar feasibility report. Our team may also reach out to discuss your project.</p>
+                <button class="btn-close-modal" id="btnCloseSuccess">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
     <script src="script.js"></script>
 </body>
 
