@@ -443,6 +443,7 @@ document.addEventListener('DOMContentLoaded', () => {
      elements.area, elements.wattage, elements.daytimeLoad, elements.backupHours,
      elements.enableNetMetering, elements.genCharge].forEach(el => {
         el.addEventListener('input', calculate);
+        el.addEventListener('change', calculate);
     });
 
     elements.projectScale.addEventListener('change', () => {
@@ -515,12 +516,22 @@ document.addEventListener('DOMContentLoaded', () => {
         rangeInput.style.background = `linear-gradient(to right, #667eea 0%, #764ba2 ${value}%, rgba(255,255,255,0.1) ${value}%, rgba(255,255,255,0.1) 100%)`;
     }
 
-    // Initialize range sliders with proper backgrounds
+    // Initialize range sliders with proper backgrounds and direct label sync
     document.querySelectorAll('input[type="range"]').forEach(slider => {
         updateRangeBackground(slider);
-        slider.addEventListener('input', (e) => {
+        const handler = (e) => {
             updateRangeBackground(e.target);
-        });
+            // Directly sync slider labels for immediate feedback
+            if (e.target === elements.daytimeLoad) {
+                elements.daytimeLoadVal.textContent = e.target.value;
+            } else if (e.target === elements.solarTarget) {
+                elements.solarTargetVal.textContent = e.target.value;
+            } else if (e.target === elements.backupHours) {
+                elements.backupHoursVal.textContent = e.target.value;
+            }
+        };
+        slider.addEventListener('input', handler);
+        slider.addEventListener('change', handler);
     });
 
     // Add input focus animations
