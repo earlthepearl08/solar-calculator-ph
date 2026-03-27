@@ -22,7 +22,7 @@
             ⚙️
         </button>
         <!-- Sidebar -->
-        <aside class="sidebar">
+        <aside class="sidebar" role="complementary" aria-label="System configuration inputs">
             <div class="sidebar-header">
                 <div class="logo-container">
                     <img src="logo.png" alt="Kinmo PW Logo" class="logo">
@@ -34,9 +34,9 @@
                 <div class="input-group">
                     <label for="projectScale">
                         Project Scale
-                        <span class="tooltip-icon" data-tooltip="Choose the category that best fits your energy needs">ⓘ</span>
+                        <span class="tooltip-icon" tabindex="0" role="button" aria-label="Choose the category that best fits your energy needs" data-tooltip="Choose the category that best fits your energy needs">ⓘ</span>
                     </label>
-                    <select id="projectScale">
+                    <select id="projectScale" aria-label="Project scale category">
                         <option value="Residential">Residential (up to 20kWp)</option>
                         <option value="C&I">C&I (21-300kWp)</option>
                         <option value="Utility Scale">Utility Scale (>300kWp)</option>
@@ -46,9 +46,9 @@
                 <div class="input-group">
                     <label for="systemType">
                         System Type
-                        <span class="tooltip-icon" data-tooltip="Grid-Tied: Connected to utility grid | Hybrid: Grid + Battery | Off-Grid: Fully independent">ⓘ</span>
+                        <span class="tooltip-icon" tabindex="0" role="button" aria-label="Grid-Tied: Connected to utility grid. Hybrid: Grid + Battery. Off-Grid: Fully independent" data-tooltip="Grid-Tied: Connected to utility grid | Hybrid: Grid + Battery | Off-Grid: Fully independent">ⓘ</span>
                     </label>
-                    <select id="systemType">
+                    <select id="systemType" aria-label="Solar system type">
                         <option value="Grid-Tied">Grid-Tied</option>
                         <option value="Hybrid">Hybrid</option>
                         <option value="Off-Grid">Off-Grid</option>
@@ -58,59 +58,61 @@
                 <div class="input-group">
                     <label for="bill">Avg. Electricity Bill (PHP)</label>
                     <div class="number-input-wrapper">
-                        <input type="number" id="bill" value="15000" step="500" min="0">
-                        <button class="clear-input" data-target="bill">×</button>
+                        <input type="number" id="bill" value="15000" step="500" min="0" aria-label="Average monthly electricity bill in Philippine Pesos">
+                        <button class="clear-input" data-target="bill" aria-label="Clear bill value">×</button>
                     </div>
                 </div>
 
                 <div class="input-group">
                     <label for="rate">Avg. Monthly Rate (PHP/kWh)</label>
                     <div class="number-input-wrapper">
-                        <input type="number" id="rate" value="13.5" step="0.1" min="1">
-                        <button class="clear-input" data-target="rate">×</button>
+                        <input type="number" id="rate" value="13.5" step="0.1" min="1" aria-label="Average electricity rate per kilowatt-hour">
+                        <button class="clear-input" data-target="rate" aria-label="Clear rate value">×</button>
                     </div>
                 </div>
 
                 <div class="input-group" id="solarTargetGroup">
-                    <label for="solarTarget">Expected Solar Consumption <span id="solarTargetVal">100</span>%</label>
-                    <input type="range" id="solarTarget" min="0" max="100" value="100">
+                    <label for="solarTarget">Target Solar Coverage <span id="solarTargetVal">100</span>%</label>
+                    <input type="range" id="solarTarget" min="0" max="100" value="100" aria-label="Target solar coverage percentage" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100">
+                    <div class="range-labels"><span>0%</span><span>100%</span></div>
                     <div class="info-box hidden" id="offGridInfo">Off-Grid systems require 100% target coverage.</div>
                 </div>
 
                 <div class="input-group">
                     <label for="area">Available Roof/Land Area (sqm)</label>
                     <div class="number-input-wrapper">
-                        <input type="number" id="area" value="50" step="5" min="0">
-                        <button class="clear-input" data-target="area">×</button>
+                        <input type="number" id="area" value="50" step="5" min="0" aria-label="Available installation area in square meters">
+                        <button class="clear-input" data-target="area" aria-label="Clear area value">×</button>
                     </div>
                 </div>
 
                 <div class="input-group">
                     <label for="wattage">
                         PV Module Wattage (Wp)
-                        <span class="tooltip-icon" data-tooltip="Power rating of each solar panel. Modern panels typically range from 400-700W">ⓘ</span>
+                        <span class="tooltip-icon" tabindex="0" role="button" aria-label="Power rating of each solar panel. Modern panels typically range from 400-700W" data-tooltip="Power rating of each solar panel. Modern panels typically range from 400-700W">ⓘ</span>
                     </label>
-                    <input type="number" id="wattage" value="620" step="10" min="100">
+                    <input type="number" id="wattage" value="620" step="10" min="100" aria-label="Solar panel wattage in watts peak">
                 </div>
 
                 <div class="input-group" id="daytimeLoadGroup">
                     <label for="daytimeLoad">Daytime Load Split <span id="daytimeLoadVal">40</span>%</label>
-                    <input type="range" id="daytimeLoad" min="0" max="100" value="40">
+                    <input type="range" id="daytimeLoad" min="0" max="100" value="40" aria-label="Percentage of electricity used during daytime" aria-valuemin="0" aria-valuemax="100" aria-valuenow="40">
+                    <div class="range-labels"><span>0%</span><span>100%</span></div>
                     <small class="help-text">Percentage of usage during sun hours (8am-4pm).</small>
                 </div>
 
                 <div class="input-group hidden" id="shiftGroup">
                     <label>Operating Shifts</label>
-                    <div class="shift-selector">
-                        <div class="shift-option active" data-shift="1">
+                    <div class="shift-selector" role="radiogroup" aria-label="Number of operating shifts">
+                        <div class="shift-option active" data-shift="1" tabindex="0" role="radio" aria-checked="true" aria-label="1 shift, 8 hours">
                             1 Shift
                             <small>8 hours</small>
                         </div>
-                        <div class="shift-option" data-shift="2">
+                        <div class="shift-option" data-shift="2" tabindex="0" role="radio" aria-checked="false" aria-label="2 shifts, 16 hours">
                             2 Shifts
                             <small>16 hours</small>
                         </div>
-                        <div class="shift-option" data-shift="3">
+                        <div class="shift-option" data-shift="3" tabindex="0" role="radio" aria-checked="false" aria-label="3 shifts, 24 hours">
                             3 Shifts
                             <small>24 hours</small>
                         </div>
@@ -129,11 +131,12 @@
                     <h3>Battery Configuration</h3>
                     <div class="input-group">
                         <label for="backupHours">Backup Duration <span id="backupHoursVal">4</span> Hours</label>
-                        <input type="range" id="backupHours" min="1" max="24" value="4">
+                        <input type="range" id="backupHours" min="1" max="24" value="4" aria-label="Battery backup duration in hours" aria-valuemin="1" aria-valuemax="24" aria-valuenow="4">
+                        <div class="range-labels"><span>1h</span><span>24h</span></div>
                     </div>
                     <div class="input-group hidden">
                         <label for="batteryUnit">Battery Unit Size</label>
-                        <select id="batteryUnit"></select>
+                        <select id="batteryUnit" aria-label="Battery unit size"></select>
                     </div>
                     <small class="help-text" style="display:block; margin-top:-0.5rem;">System automatically selects optimal battery configuration.</small>
                 </div>
@@ -143,20 +146,26 @@
                     <hr>
                     <h3>Advanced Features</h3>
                     <div class="checkbox-group">
-                        <input type="checkbox" id="enableNetMetering">
+                        <input type="checkbox" id="enableNetMetering" aria-label="Enable net metering to sell surplus power back to the grid">
                         <label for="enableNetMetering">Enable Net Metering</label>
                     </div>
                     <div class="input-group hidden" id="genChargeGroup">
                         <label for="genCharge">Avg. Generation Charge (PHP/kWh)</label>
-                        <input type="number" id="genCharge" value="5.5" step="0.1" min="0">
+                        <input type="number" id="genCharge" value="5.5" step="0.1" min="0" aria-label="Average generation charge rate">
                         <small class="help-text">Rate utility buys your excess power.</small>
                     </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="sidebar-actions">
+                    <button class="btn-reset" id="btnReset" aria-label="Reset all inputs to default values">Reset to Defaults</button>
+                    <button class="btn-share" id="btnShare" aria-label="Copy shareable link to clipboard">Share Config</button>
                 </div>
             </div>
         </aside>
 
         <!-- Main Content -->
-        <main class="main-content">
+        <main class="main-content" role="main">
             <header class="main-header">
                 <h1>Kinmo PW Solar Feasibility Tool</h1>
                 <div class="project-tag" id="displayProjectScale">Residential Project</div>
@@ -176,7 +185,7 @@
                 </div>
             </div>
 
-            <div id="statusAlerts"></div>
+            <div id="statusAlerts" aria-live="polite" role="status"></div>
 
             <!-- Primary Metrics -->
             <div class="metrics-grid">
@@ -239,15 +248,15 @@
                         </div>
                         <div id="sc2Disabled" class="disabled-msg hidden">
                             <h4>2. With Net Metering</h4>
-                            <p>(Optional Advanced Feature)</p>
+                            <p>Sell surplus solar energy back to the grid for credits on your bill.</p>
                             <div class="savings-placeholder">₱ --</div>
-                            <p>Enable in System Inputs</p>
+                            <p>Enable in System Inputs to see projected savings.</p>
                         </div>
                         <div id="sc2OffGrid" class="off-grid-msg hidden">
                             <h4>Off-Grid System Note</h4>
-                            <p>Full independence from the grid.</p>
+                            <p>Full independence from the grid. No utility connection needed.</p>
                             <div class="off-grid-badge">Off-Grid</div>
-                            <p>Relies 100% on PV + Battery</p>
+                            <p>Relies 100% on PV + Battery storage.</p>
                         </div>
                     </div>
                 </div>
@@ -287,7 +296,7 @@
                 <h3>Contact Us</h3>
                 <p>For professional installation and detailed assessments:</p>
                 <a href="https://www.facebook.com/messages/t/kinmopwcorporation?text=Hello!%20I%20used%20your%20Solar%20Feasibility%20Tool%20and%20would%20like%20to%20request%20a%20quote."
-                    class="btn-cta" target="_blank">
+                    class="btn-cta" target="_blank" rel="noopener noreferrer">
                     💬 Request a Quote from Kinmo
                 </a>
                 <div class="contact-info">
@@ -301,12 +310,17 @@
     </div>
 
     <!-- Report Request Modal -->
-    <div class="modal-overlay" id="reportModal">
+    <div class="modal-overlay" id="reportModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
         <div class="modal-content">
-            <button class="modal-close" id="modalClose">&times;</button>
-            <h3>Get Your Custom Solar Report</h3>
+            <button class="modal-close" id="modalClose" aria-label="Close modal">&times;</button>
+            <h3 id="modalTitle">Get Your Custom Solar Report</h3>
             <p>Enter your details below and we'll send you a professional PDF summary of your solar feasibility analysis.</p>
             <form id="reportForm">
+                <!-- Honeypot field - hidden from real users -->
+                <div class="sr-only" aria-hidden="true">
+                    <label for="website_url">Website</label>
+                    <input type="text" id="website_url" name="website_url" tabindex="-1" autocomplete="off">
+                </div>
                 <div class="form-group">
                     <label for="customerName">Full Name *</label>
                     <input type="text" id="customerName" name="customerName" required placeholder="Juan Dela Cruz">
