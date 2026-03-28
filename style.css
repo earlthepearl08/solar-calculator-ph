@@ -1304,6 +1304,15 @@ body {
     color: var(--success);
 }
 
+.cost-breakdown {
+    display: block;
+    margin-top: 0.35rem;
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    letter-spacing: 0.02em;
+}
+
 .roi-disclaimer {
     font-size: 0.75rem;
     color: var(--text-muted);

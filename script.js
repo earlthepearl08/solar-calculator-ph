@@ -422,6 +422,12 @@ document.addEventListener('DOMContentLoaded', () => {
         return 50000;
     }
 
+    function getBatteryCostPerKwh(scale) {
+        if (scale === 'Residential') return 20000;
+        if (scale === 'C&I') return 15000;
+        return 12000; // Utility Scale
+    }
+
     // ==================== BATTERY LOGIC ====================
     function findOptimalBattery(requiredKwh, scale) {
         const options = batteryOptionsMap[scale];
@@ -533,7 +539,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const costPerKwp = getCostPerKwp(scale, displayKwp);
-        const estimatedSystemCost = displayKwp * costPerKwp;
+        const solarCost = displayKwp * costPerKwp;
+        const batteryCost = (type !== 'Grid-Tied' && batteryCapacityTotal > 0)
+            ? batteryCapacityTotal * getBatteryCostPerKwh(scale) : 0;
+        const estimatedSystemCost = solarCost + batteryCost;
         const annualSavings = c1MonthlySavings * 12;
         const paybackYears = annualSavings > 0 ? estimatedSystemCost / annualSavings : 0;
         const totalLifetimeSavings = annualSavings * SYSTEM_LIFESPAN_YEARS;
@@ -548,7 +557,7 @@ document.addEventListener('DOMContentLoaded', () => {
             batteryCapacityTotal, numBatt, batteryUnitLabel, usableBatteryKwh, batteryShiftedKwh,
             c1Title, c1Desc, c1DailySavingsKwh, c1MonthlySavings, c1Offset, residualSurplusKwh,
             c2MonthlySavings, c2Offset,
-            estimatedSystemCost, costPerKwp, paybackYears, roi, annualSavings, totalLifetimeSavings,
+            solarCost, batteryCost, estimatedSystemCost, costPerKwp, paybackYears, roi, annualSavings, totalLifetimeSavings,
             batteryConfig, isSpaceLimited, numPanelsRequired, cappedPanelsPossible
         };
     }
@@ -636,6 +645,18 @@ document.addEventListener('DOMContentLoaded', () => {
         if (elements.resSystemCost) elements.resSystemCost.textContent = formatPHPShort(r.estimatedSystemCost);
         if (elements.resPayback) elements.resPayback.textContent = r.paybackYears > 0 ? r.paybackYears.toFixed(1) + " years" : "N/A";
         if (elements.resROI) elements.resROI.textContent = r.roi > 0 ? r.roi.toFixed(0) + "%" : "N/A";
+
+        // Cost breakdown (PV + Battery)
+        const breakdownEl = document.getElementById('resCostBreakdown');
+        if (breakdownEl) {
+            if (r.batteryCost > 0) {
+                breakdownEl.textContent = 'PV: ' + formatPHPShort(r.solarCost) + ' + Battery: ' + formatPHPShort(r.batteryCost);
+                breakdownEl.classList.remove('hidden');
+            } else {
+                breakdownEl.textContent = '';
+                breakdownEl.classList.add('hidden');
+            }
+        }
 
         // Store results for report
         window.solarCalcResults = {
@@ -1289,7 +1310,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <div class="wizard-summary-item">
                     <span class="wizard-summary-label">Est. Cost</span>
-                    <span class="wizard-summary-value">${formatPHPShort(r.estimatedSystemCost)}</span>
+                    <span class="wizard-summary-value">${formatPHPShort(r.estimatedSystemCost)}${r.batteryCost > 0 ? '<br><small style="font-size:0.7em;opacity:0.7">PV: ' + formatPHPShort(r.solarCost) + ' + Battery: ' + formatPHPShort(r.batteryCost) + '</small>' : ''}</span>
                 </div>
                 <div class="wizard-summary-item">
                     <span class="wizard-summary-label">Monthly Savings</span>
