@@ -403,10 +403,10 @@ document.addEventListener('DOMContentLoaded', () => {
         systemType: 'Grid-Tied',
         bill: '15000',
         rate: '13.5',
-        solarTarget: '100',
+        solarTarget: '50',
         area: '50',
         wattage: '620',
-        daytimeLoad: '40',
+        daytimeLoad: '75',
         backupHours: '4',
         enableNetMetering: false,
         genCharge: '5.5'
@@ -1169,7 +1169,7 @@ document.addEventListener('DOMContentLoaded', () => {
         systemType: 'Grid-Tied',
         bill: 15000, rate: 13.5,
         area: 50, wattage: 620,
-        solarTarget: 100, daytimeLoad: 40,
+        solarTarget: 50, daytimeLoad: 75,
         backupHours: 4, enableNetMetering: false
     };
 
@@ -1182,8 +1182,8 @@ document.addEventListener('DOMContentLoaded', () => {
         wizardState.rate = parseFloat(elements.rate.value) || 13.5;
         wizardState.area = parseFloat(elements.area.value) || 50;
         wizardState.wattage = parseFloat(elements.wattage.value) || 620;
-        wizardState.solarTarget = parseInt(elements.solarTarget.value) || 100;
-        wizardState.daytimeLoad = parseInt(elements.daytimeLoad.value) || 40;
+        wizardState.solarTarget = parseInt(elements.solarTarget.value) || 50;
+        wizardState.daytimeLoad = parseInt(elements.daytimeLoad.value) || 75;
         wizardState.backupHours = parseInt(elements.backupHours.value) || 4;
         wizardState.enableNetMetering = elements.enableNetMetering.checked;
 
@@ -1290,8 +1290,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (wizRate) wizardState.rate = parseFloat(wizRate.value) || 13.5;
         if (wizArea) wizardState.area = parseFloat(wizArea.value) || 50;
         if (wizWattage) wizardState.wattage = parseFloat(wizWattage.value) || 620;
-        if (wizSolarTarget) wizardState.solarTarget = parseInt(wizSolarTarget.value) || 100;
-        if (wizDaytimeLoad) wizardState.daytimeLoad = parseInt(wizDaytimeLoad.value) || 40;
+        if (wizSolarTarget) wizardState.solarTarget = parseInt(wizSolarTarget.value) || 50;
+        if (wizDaytimeLoad) wizardState.daytimeLoad = parseInt(wizDaytimeLoad.value) || 75;
         if (wizBackupHours) wizardState.backupHours = parseInt(wizBackupHours.value) || 4;
         if (wizNetMetering) wizardState.enableNetMetering = wizNetMetering.checked;
     }
