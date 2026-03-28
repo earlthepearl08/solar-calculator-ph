@@ -341,7 +341,9 @@ document.addEventListener('DOMContentLoaded', () => {
         rate: document.getElementById('rate'),
         solarTarget: document.getElementById('solarTarget'),
         solarTargetVal: document.getElementById('solarTargetVal'),
+        roofType: document.getElementById('roofType'),
         area: document.getElementById('area'),
+        recommendedArea: document.getElementById('recommendedArea'),
         wattage: document.getElementById('wattage'),
         daytimeLoad: document.getElementById('daytimeLoad'),
         daytimeLoadVal: document.getElementById('daytimeLoadVal'),
@@ -403,7 +405,7 @@ document.addEventListener('DOMContentLoaded', () => {
         systemType: 'Grid-Tied',
         bill: '15000',
         rate: '13.5',
-        solarTarget: '50',
+        solarTarget: '100',
         area: '50',
         wattage: '620',
         daytimeLoad: '75',
@@ -720,6 +722,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (savingsChart) savingsChart.update({ annualSavings: r.annualSavings, estimatedSystemCost: r.estimatedSystemCost, paybackYears: r.paybackYears });
         updateComparisonTable(params);
         updateSensitivityAnalysis(params);
+        updateRecommendedArea();
 
         saveToLocalStorage();
     }
@@ -827,7 +830,8 @@ document.addEventListener('DOMContentLoaded', () => {
             backupHours: elements.backupHours.value,
             enableNetMetering: elements.enableNetMetering.checked,
             genCharge: elements.genCharge.value,
-            currentShift
+            currentShift,
+            roofType: elements.roofType.value
         };
         try {
             localStorage.setItem('solarCalcState', JSON.stringify(state));
@@ -840,10 +844,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!saved) return false;
             const state = JSON.parse(saved);
             if (state.projectScale) elements.projectScale.value = state.projectScale;
+            if (state.projectScale) updateRoofTypeOptions();
             if (state.systemType) elements.systemType.value = state.systemType;
             if (state.bill) elements.bill.value = state.bill;
             if (state.rate) elements.rate.value = state.rate;
             if (state.solarTarget) elements.solarTarget.value = state.solarTarget;
+            if (state.roofType) elements.roofType.value = state.roofType;
             if (state.area) elements.area.value = state.area;
             if (state.wattage) elements.wattage.value = state.wattage;
             if (state.daytimeLoad) elements.daytimeLoad.value = state.daytimeLoad;
@@ -940,6 +946,69 @@ document.addEventListener('DOMContentLoaded', () => {
         else { elements.genChargeGroup.classList.add('hidden'); }
     });
 
+    // ==================== ROOF TYPE ESTIMATION ====================
+    const roofTypeAreas = {
+        Residential: { bungalow: 80, '2story': 50, townhouse: 35, condo: 20 },
+        'C&I': { small_commercial: 100, medium_commercial: 300, warehouse: 800 },
+        'Utility Scale': { small_land: 2000, large_land: 10000 }
+    };
+
+    function updateRoofTypeOptions() {
+        const scale = elements.projectScale.value;
+        const roofType = elements.roofType;
+        roofType.innerHTML = '<option value="custom">I know my area</option>';
+        const opts = roofTypeAreas[scale] || roofTypeAreas['Residential'];
+        const labels = {
+            bungalow: 'Bungalow', '2story': '2-Story House', townhouse: 'Townhouse', condo: 'Apartment / Condo',
+            small_commercial: 'Small Office / Shop', medium_commercial: 'Medium Building', warehouse: 'Large Building / Warehouse',
+            small_land: 'Open Land (Small)', large_land: 'Open Land (Large)'
+        };
+        Object.entries(opts).forEach(([key, sqm]) => {
+            const opt = document.createElement('option');
+            opt.value = key;
+            opt.textContent = (labels[key] || key) + ' (~' + sqm + ' sqm)';
+            roofType.appendChild(opt);
+        });
+    }
+
+    elements.roofType.addEventListener('change', () => {
+        const scale = elements.projectScale.value;
+        const selected = elements.roofType.value;
+        if (selected !== 'custom') {
+            const opts = roofTypeAreas[scale] || roofTypeAreas['Residential'];
+            if (opts[selected]) {
+                elements.area.value = opts[selected];
+                calculate();
+            }
+        }
+    });
+
+    // Update roof type options when project scale changes
+    elements.projectScale.addEventListener('change', () => {
+        updateRoofTypeOptions();
+        elements.roofType.value = 'custom';
+    });
+
+    function updateRecommendedArea() {
+        const bill = Math.max(0, parseFloat(elements.bill.value) || 0);
+        const rate = Math.max(0.01, parseFloat(elements.rate.value) || 1);
+        const solarTargetPct = parseInt(elements.solarTarget.value) || 100;
+        const wattage = Math.max(100, parseFloat(elements.wattage.value) || 620);
+        const type = elements.systemType.value;
+        const dailyKwh = (bill / rate) / DAYS_PER_MONTH;
+        const targetDaily = dailyKwh * (solarTargetPct / 100);
+        const designFactor = type === 'Off-Grid' ? OFFGRID_DESIGN_FACTOR : 1.0;
+        const requiredKwp = (PSH * EFFICIENCY > 0) ? (targetDaily / (PSH * EFFICIENCY)) * designFactor : 0;
+        let panels = Math.ceil((requiredKwp * 1000) / wattage) || 0;
+        panels = Math.ceil(panels / PANEL_ROUND_MULTIPLE) * PANEL_ROUND_MULTIPLE;
+        const neededArea = panels * PANEL_SIZE_SQM;
+        if (elements.recommendedArea && neededArea > 0) {
+            elements.recommendedArea.textContent = 'Recommended: ~' + neededArea.toFixed(0) + ' sqm for ' + solarTargetPct + '% coverage';
+        }
+    }
+
+    updateRoofTypeOptions();
+
     clearButtons.forEach(btn => {
         btn.addEventListener('click', (e) => {
             const targetId = e.currentTarget.getAttribute('data-target');
@@ -973,6 +1042,8 @@ document.addEventListener('DOMContentLoaded', () => {
             elements.solarTargetVal.value = DEFAULTS.solarTarget;
             elements.daytimeLoadVal.value = DEFAULTS.daytimeLoad;
             elements.backupHoursVal.value = DEFAULTS.backupHours;
+            updateRoofTypeOptions();
+            elements.roofType.value = 'custom';
             elements.area.value = DEFAULTS.area;
             elements.wattage.value = DEFAULTS.wattage;
             elements.daytimeLoad.value = DEFAULTS.daytimeLoad;
@@ -1169,7 +1240,7 @@ document.addEventListener('DOMContentLoaded', () => {
         systemType: 'Grid-Tied',
         bill: 15000, rate: 13.5,
         area: 50, wattage: 620,
-        solarTarget: 50, daytimeLoad: 75,
+        solarTarget: 100, daytimeLoad: 75,
         backupHours: 4, enableNetMetering: false
     };
 
@@ -1182,7 +1253,7 @@ document.addEventListener('DOMContentLoaded', () => {
         wizardState.rate = parseFloat(elements.rate.value) || 13.5;
         wizardState.area = parseFloat(elements.area.value) || 50;
         wizardState.wattage = parseFloat(elements.wattage.value) || 620;
-        wizardState.solarTarget = parseInt(elements.solarTarget.value) || 50;
+        wizardState.solarTarget = parseInt(elements.solarTarget.value) || 100;
         wizardState.daytimeLoad = parseInt(elements.daytimeLoad.value) || 75;
         wizardState.backupHours = parseInt(elements.backupHours.value) || 4;
         wizardState.enableNetMetering = elements.enableNetMetering.checked;
@@ -1290,7 +1361,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (wizRate) wizardState.rate = parseFloat(wizRate.value) || 13.5;
         if (wizArea) wizardState.area = parseFloat(wizArea.value) || 50;
         if (wizWattage) wizardState.wattage = parseFloat(wizWattage.value) || 620;
-        if (wizSolarTarget) wizardState.solarTarget = parseInt(wizSolarTarget.value) || 50;
+        if (wizSolarTarget) wizardState.solarTarget = parseInt(wizSolarTarget.value) || 100;
         if (wizDaytimeLoad) wizardState.daytimeLoad = parseInt(wizDaytimeLoad.value) || 75;
         if (wizBackupHours) wizardState.backupHours = parseInt(wizBackupHours.value) || 4;
         if (wizNetMetering) wizardState.enableNetMetering = wizNetMetering.checked;

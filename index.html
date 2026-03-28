@@ -72,18 +72,29 @@
                 </div>
 
                 <div class="input-group" id="solarTargetGroup">
-                    <label for="solarTarget">Target Solar Coverage <input type="number" id="solarTargetVal" class="inline-range-input" value="50" min="0" max="100" step="1" aria-label="Target solar coverage value">%</label>
-                    <input type="range" id="solarTarget" min="0" max="100" value="50" aria-label="Target solar coverage percentage" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50">
+                    <label for="solarTarget">Target Solar Coverage <input type="number" id="solarTargetVal" class="inline-range-input" value="100" min="0" max="100" step="1" aria-label="Target solar coverage value">%</label>
+                    <input type="range" id="solarTarget" min="0" max="100" value="100" aria-label="Target solar coverage percentage" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100">
                     <div class="range-labels"><span>0%</span><span>100%</span></div>
                     <div class="info-box hidden" id="offGridInfo">Off-Grid systems require 100% target coverage.</div>
                 </div>
 
+                <div class="input-group">
+                    <label for="roofType">Roof / Site Type</label>
+                    <select id="roofType" aria-label="Building or site type for area estimation">
+                        <option value="custom">I know my area</option>
+                        <option value="bungalow">Bungalow (~80 sqm)</option>
+                        <option value="2story">2-Story House (~50 sqm)</option>
+                        <option value="townhouse">Townhouse (~35 sqm)</option>
+                        <option value="condo">Apartment / Condo (~20 sqm)</option>
+                    </select>
+                </div>
                 <div class="input-group">
                     <label for="area">Available Roof/Land Area (sqm)</label>
                     <div class="number-input-wrapper">
                         <input type="number" id="area" value="50" step="5" min="0" aria-label="Available installation area in square meters">
                         <button class="clear-input" data-target="area" aria-label="Clear area value">×</button>
                     </div>
+                    <small class="help-text" id="recommendedArea"></small>
                 </div>
 
                 <div class="input-group">
@@ -491,8 +502,8 @@
                 <p>Fine-tune your analysis or keep the defaults.</p>
                 <div class="wizard-inputs">
                     <div class="wizard-input-group">
-                        <label for="wizSolarTarget">Solar Coverage Target: <span id="wizSolarTargetVal">50</span>%</label>
-                        <input type="range" id="wizSolarTarget" min="0" max="100" value="50">
+                        <label for="wizSolarTarget">Solar Coverage Target: <span id="wizSolarTargetVal">100</span>%</label>
+                        <input type="range" id="wizSolarTarget" min="0" max="100" value="100">
                     </div>
                     <div class="wizard-input-group">
                         <label for="wizDaytimeLoad">Daytime Load: <span id="wizDaytimeLoadVal">75</span>%</label>
