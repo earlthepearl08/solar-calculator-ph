@@ -24,7 +24,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const DEBOUNCE_MS = 150;
 
     // ==================== UTILITIES ====================
-    // Debounce to prevent rapid recalculations
     function debounce(fn, ms) {
         let timer;
         return function (...args) {
@@ -33,44 +32,44 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    // Animation cancellation map
     const activeAnimations = new Map();
 
     function animateValue(element, start, end, duration = 800, suffix = '') {
         if (!element) return;
 
-        // Cancel any running animation on this element
         if (activeAnimations.has(element)) {
             cancelAnimationFrame(activeAnimations.get(element));
         }
 
-        // Respect reduced motion preference
         if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
             element.textContent = end.toFixed(end < 10 ? 2 : 1) + suffix;
             return;
         }
 
-        const startTime = performance.now();
+        element.classList.add('updating');
         const range = end - start;
+        const startTime = performance.now();
 
-        function update(currentTime) {
+        function step(currentTime) {
             const elapsed = currentTime - startTime;
             const progress = Math.min(elapsed / duration, 1);
-            const easeOutQuart = 1 - Math.pow(1 - progress, 4);
-            const current = start + (range * easeOutQuart);
+            const easeProgress = 1 - Math.pow(1 - progress, 4);
+            const current = start + (range * easeProgress);
 
-            element.textContent = current.toFixed(end < 10 ? 2 : 1) + suffix;
-            element.classList.add('updating');
+            element.textContent = current.toFixed(current < 10 ? 2 : 1) + suffix;
 
             if (progress < 1) {
-                activeAnimations.set(element, requestAnimationFrame(update));
+                const frameId = requestAnimationFrame(step);
+                activeAnimations.set(element, frameId);
             } else {
+                element.textContent = end.toFixed(end < 10 ? 2 : 1) + suffix;
                 activeAnimations.delete(element);
                 setTimeout(() => element.classList.remove('updating'), 300);
             }
         }
 
-        activeAnimations.set(element, requestAnimationFrame(update));
+        const frameId = requestAnimationFrame(step);
+        activeAnimations.set(element, frameId);
     }
 
     function formatPHP(val) {
@@ -86,13 +85,252 @@ document.addEventListener('DOMContentLoaded', () => {
         return '₱' + val.toFixed(0);
     }
 
-    // Clamp a value within min/max
     function clampInput(el) {
         const val = parseFloat(el.value);
         const min = parseFloat(el.min);
         const max = parseFloat(el.max);
         if (!isNaN(min) && val < min) el.value = min;
         if (!isNaN(max) && val > max) el.value = max;
+    }
+
+    // ==================== SAVINGS CHART CLASS ====================
+    class SavingsChart {
+        constructor(canvas) {
+            this.canvas = canvas;
+            this.ctx = canvas.getContext('2d');
+            this.reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            this.data = null;
+            this.animationProgress = 1;
+            this.animationFrame = null;
+
+            this.motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+            this.motionQuery.addEventListener('change', (e) => {
+                this.reducedMotion = e.matches;
+            });
+
+            this.resizeObserver = new ResizeObserver(() => this.handleResize());
+            this.resizeObserver.observe(this.canvas.parentElement);
+        }
+
+        handleResize() {
+            const container = this.canvas.parentElement;
+            const dpr = window.devicePixelRatio || 1;
+            const rect = container.getBoundingClientRect();
+            const h = Math.min(rect.width * 0.5, 400);
+            this.canvas.width = rect.width * dpr;
+            this.canvas.height = h * dpr;
+            this.canvas.style.width = rect.width + 'px';
+            this.canvas.style.height = h + 'px';
+            this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            if (this.data) this.draw();
+        }
+
+        update(results) {
+            const years = [];
+            for (let y = 0; y <= SYSTEM_LIFESPAN_YEARS; y++) {
+                years.push({
+                    year: y,
+                    cumulativeSavings: results.annualSavings * y,
+                    systemCost: results.estimatedSystemCost
+                });
+            }
+            this.data = {
+                years,
+                paybackYear: results.paybackYears,
+                systemCost: results.estimatedSystemCost,
+                annualSavings: results.annualSavings
+            };
+
+            if (this.reducedMotion) {
+                this.animationProgress = 1;
+                this.handleResize();
+            } else {
+                this.animateIn();
+            }
+        }
+
+        animateIn() {
+            this.animationProgress = 0;
+            const duration = 800;
+            const start = performance.now();
+            const step = (now) => {
+                const elapsed = now - start;
+                this.animationProgress = Math.min(elapsed / duration, 1);
+                this.handleResize();
+                if (this.animationProgress < 1) {
+                    this.animationFrame = requestAnimationFrame(step);
+                }
+            };
+            if (this.animationFrame) cancelAnimationFrame(this.animationFrame);
+            this.animationFrame = requestAnimationFrame(step);
+        }
+
+        draw() {
+            const ctx = this.ctx;
+            const w = this.canvas.width / (window.devicePixelRatio || 1);
+            const h = this.canvas.height / (window.devicePixelRatio || 1);
+
+            const styles = getComputedStyle(document.documentElement);
+            const colorPrimary = styles.getPropertyValue('--primary').trim() || '#3b82f6';
+            const colorSuccess = styles.getPropertyValue('--success').trim() || '#10b981';
+            const colorDanger = styles.getPropertyValue('--danger').trim() || '#ef4444';
+            const colorAccent = styles.getPropertyValue('--accent').trim() || '#f59e0b';
+            const colorMuted = styles.getPropertyValue('--text-muted').trim() || '#94a3b8';
+
+            ctx.clearRect(0, 0, w, h);
+
+            if (!this.data || this.data.systemCost <= 0) {
+                ctx.fillStyle = colorMuted;
+                ctx.font = '500 14px Inter, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('Enter values to see savings projection', w / 2, h / 2);
+                return;
+            }
+
+            const pad = { left: 75, right: 25, top: 30, bottom: 45 };
+            const chartW = w - pad.left - pad.right;
+            const chartH = h - pad.top - pad.bottom;
+
+            const maxSavings = this.data.years[this.data.years.length - 1].cumulativeSavings;
+            const yMax = Math.max(this.data.systemCost, maxSavings) * 1.15;
+            const xMax = SYSTEM_LIFESPAN_YEARS;
+
+            const toX = (year) => pad.left + (year / xMax) * chartW;
+            const toY = (val) => pad.top + chartH - (val / yMax) * chartH;
+
+            // Gridlines
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+            ctx.lineWidth = 1;
+            const gridSteps = 5;
+            for (let i = 0; i <= gridSteps; i++) {
+                const val = (yMax / gridSteps) * i;
+                const y = toY(val);
+                ctx.beginPath();
+                ctx.moveTo(pad.left, y);
+                ctx.lineTo(w - pad.right, y);
+                ctx.stroke();
+
+                ctx.fillStyle = colorMuted;
+                ctx.font = '600 10px Inter, sans-serif';
+                ctx.textAlign = 'right';
+                ctx.fillText(formatPHPShort(val), pad.left - 10, y + 4);
+            }
+
+            // X-axis labels
+            ctx.textAlign = 'center';
+            ctx.font = '600 10px Inter, sans-serif';
+            for (let yr = 0; yr <= xMax; yr += 3) {
+                const x = toX(yr);
+                ctx.fillStyle = colorMuted;
+                ctx.fillText('Yr ' + yr, x, h - pad.bottom + 20);
+
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+                ctx.beginPath();
+                ctx.moveTo(x, pad.top);
+                ctx.lineTo(x, pad.top + chartH);
+                ctx.stroke();
+            }
+
+            // Clip to animation progress
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(pad.left, 0, chartW * this.animationProgress, h);
+            ctx.clip();
+
+            // System cost line (dashed)
+            const costY = toY(this.data.systemCost);
+            ctx.setLineDash([6, 4]);
+            ctx.strokeStyle = colorDanger;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(pad.left, costY);
+            ctx.lineTo(w - pad.right, costY);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Cost label
+            ctx.fillStyle = colorDanger;
+            ctx.font = '700 10px Inter, sans-serif';
+            ctx.textAlign = 'left';
+            ctx.fillText('System Cost: ' + formatPHPShort(this.data.systemCost), pad.left + 5, costY - 8);
+
+            // Savings area fill
+            const gradient = ctx.createLinearGradient(pad.left, pad.top + chartH, pad.left, pad.top);
+            gradient.addColorStop(0, 'rgba(59, 130, 246, 0.02)');
+            gradient.addColorStop(0.5, 'rgba(59, 130, 246, 0.12)');
+            gradient.addColorStop(1, 'rgba(16, 185, 129, 0.2)');
+
+            ctx.beginPath();
+            ctx.moveTo(toX(0), toY(0));
+            for (const pt of this.data.years) {
+                ctx.lineTo(toX(pt.year), toY(pt.cumulativeSavings));
+            }
+            ctx.lineTo(toX(xMax), toY(0));
+            ctx.closePath();
+            ctx.fillStyle = gradient;
+            ctx.fill();
+
+            // Savings line
+            const lineGrad = ctx.createLinearGradient(pad.left, 0, w - pad.right, 0);
+            lineGrad.addColorStop(0, colorPrimary);
+            lineGrad.addColorStop(1, colorSuccess);
+            ctx.strokeStyle = lineGrad;
+            ctx.lineWidth = 3;
+            ctx.lineJoin = 'round';
+            ctx.beginPath();
+            for (let i = 0; i < this.data.years.length; i++) {
+                const pt = this.data.years[i];
+                const x = toX(pt.year);
+                const y = toY(pt.cumulativeSavings);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+
+            // Data points
+            for (const pt of this.data.years) {
+                const x = toX(pt.year);
+                const y = toY(pt.cumulativeSavings);
+                ctx.beginPath();
+                ctx.arc(x, y, 3, 0, Math.PI * 2);
+                ctx.fillStyle = colorPrimary;
+                ctx.fill();
+            }
+
+            // Break-even marker
+            if (this.data.paybackYear > 0 && this.data.paybackYear <= xMax) {
+                const bx = toX(this.data.paybackYear);
+                const by = toY(this.data.systemCost);
+
+                ctx.setLineDash([4, 3]);
+                ctx.strokeStyle = colorAccent;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(bx, pad.top);
+                ctx.lineTo(bx, pad.top + chartH);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // Marker circle
+                ctx.beginPath();
+                ctx.arc(bx, by, 7, 0, Math.PI * 2);
+                ctx.fillStyle = colorAccent;
+                ctx.fill();
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Label
+                ctx.fillStyle = colorAccent;
+                ctx.font = '700 11px Inter, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('Break-even', bx, pad.top - 5);
+                ctx.font = '600 10px Inter, sans-serif';
+                ctx.fillText('Year ' + this.data.paybackYear.toFixed(1), bx, pad.top + 10);
+            }
+
+            ctx.restore();
+        }
     }
 
     // ==================== DOM ELEMENTS ====================
@@ -148,7 +386,6 @@ document.addEventListener('DOMContentLoaded', () => {
         btnReset: document.getElementById('btnReset')
     };
 
-    // Cached NodeLists
     const shiftOptions = document.querySelectorAll('.shift-option');
     const clearButtons = document.querySelectorAll('.clear-input');
 
@@ -161,7 +398,6 @@ document.addEventListener('DOMContentLoaded', () => {
         'Utility Scale': { '215kWh': 215, '1MWh': 1000 }
     };
 
-    // Default input values for reset
     const DEFAULTS = {
         projectScale: 'Residential',
         systemType: 'Grid-Tied',
@@ -177,10 +413,6 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // ==================== COST CALCULATION ====================
-    // Residential: ₱65,000/kWp
-    // C&I 21-100kWp: ₱60,000/kWp
-    // C&I 100-300kWp: ₱57,000/kWp
-    // Utility Scale (300kWp+): ₱50,000/kWp
     function getCostPerKwp(scale, capacityKwp) {
         if (scale === 'Residential') {
             return 65000;
@@ -217,51 +449,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateBatteryOptions() {
         const scale = elements.projectScale.value;
-        const options = batteryOptionsMap[scale];
+        const options = batteryOptionsMap[scale] || {};
         elements.batteryUnit.innerHTML = '';
-        Object.keys(options).forEach(label => {
+        Object.entries(options).forEach(([label]) => {
             const opt = document.createElement('option');
-            opt.value = options[label];
+            opt.value = label;
             opt.textContent = label;
             elements.batteryUnit.appendChild(opt);
         });
         elements.batteryUnit.selectedIndex = elements.batteryUnit.options.length - 1;
     }
 
-    // ==================== MAIN CALCULATION ====================
-    function calculate() {
-        const scale = elements.projectScale.value;
-        const type = elements.systemType.value;
-        const bill = Math.max(0, parseFloat(elements.bill.value) || 0);
-        const rate = Math.max(0, parseFloat(elements.rate.value) || 0);
-        const solarTargetPct = type === 'Off-Grid' ? 100 : parseInt(elements.solarTarget.value);
-        const area = Math.max(0, parseFloat(elements.area.value) || 0);
-        const wattage = Math.max(100, parseFloat(elements.wattage.value) || 620);
+    // ==================== PURE COMPUTATION FUNCTION ====================
+    function computeSolar(params) {
+        const { scale, type, bill, rate, solarTargetPct, area, wattage, daytimeLoadPct, backupHours, enableNetMetering, genChargeRate } = params;
 
-        // Calculate daytime load percentage based on project scale
-        let daytimeLoadPct;
-        if (scale === 'Residential') {
-            daytimeLoadPct = parseInt(elements.daytimeLoad.value);
-        } else {
-            const shiftToDaytimeMap = {
-                1: 85,  // 1 shift (8h): peak daytime coverage + spillover
-                2: 55,  // 2 shifts (16h): moderate daytime coverage
-                3: 40   // 3 shifts (24h): 24/7 with extended generation
-            };
-            daytimeLoadPct = shiftToDaytimeMap[currentShift] || 55;
-        }
-
-        const backupHours = parseInt(elements.backupHours.value);
-        const enableNetMetering = elements.enableNetMetering.checked;
-        const genChargeRate = Math.max(0, parseFloat(elements.genCharge.value) || 0);
-
-        // Update visual labels
-        elements.displayProjectScale.textContent = scale + " Project";
-        elements.solarTargetVal.textContent = solarTargetPct;
-        elements.daytimeLoadVal.textContent = daytimeLoadPct;
-        elements.backupHoursVal.textContent = backupHours;
-
-        // Core solar calculations
         const monthlyKwh = rate > 0 ? bill / rate : 0;
         const dailyKwh = monthlyKwh / DAYS_PER_MONTH;
         const targetDailySolarKwh = dailyKwh * (solarTargetPct / 100);
@@ -275,21 +477,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const totalPanelsPossible = Math.floor(area / PANEL_SIZE_SQM) || 0;
         const cappedPanelsPossible = Math.floor(totalPanelsPossible / PANEL_ROUND_MULTIPLE) * PANEL_ROUND_MULTIPLE;
 
-        // Final metrics
         const displayPanels = Math.min(numPanelsRequired, cappedPanelsPossible);
         const displayKwp = (displayPanels * wattage) / 1000;
         const displayArea = displayPanels * PANEL_SIZE_SQM;
 
-        // Animate metric values
-        const prevCapacity = parseFloat(elements.resCapacity.textContent) || 0;
-        const prevPanels = parseFloat(elements.resPanels.textContent) || 0;
-        const prevArea = parseFloat(elements.resArea.textContent) || 0;
-
-        animateValue(elements.resCapacity, prevCapacity, displayKwp, 800, " kWp");
-        animateValue(elements.resPanels, prevPanels, displayPanels, 800, "");
-        animateValue(elements.resArea, prevArea, displayArea, 800, " m²");
-
-        // Production details
         const effectiveDailySolarKwh = displayKwp * PSH * EFFICIENCY;
         const daytimeLoadKwh = dailyKwh * (daytimeLoadPct / 100);
         const nighttimeLoadKwh = dailyKwh - daytimeLoadKwh;
@@ -297,7 +488,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const directConsumedKwh = Math.min(effectiveDailySolarKwh, daytimeLoadKwh);
         const surplusSolarKwh = Math.max(0, effectiveDailySolarKwh - daytimeLoadKwh);
 
-        // Battery logic
         const avgHourlyLoad = dailyKwh / 24;
         const backupStorageNeeded = avgHourlyLoad * backupHours;
 
@@ -314,15 +504,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const usableBatteryKwh = batteryCapacityTotal * BATTERY_DOD;
         const batteryShiftedKwh = Math.min(surplusSolarKwh, usableBatteryKwh, nighttimeLoadKwh);
 
-        if (type === 'Grid-Tied') {
-            elements.resStorageCard.classList.add('hidden');
-        } else {
-            elements.resStorageCard.classList.remove('hidden');
-            const prevStorage = parseFloat(elements.resStorage.textContent) || 0;
-            animateValue(elements.resStorage, prevStorage, batteryCapacityTotal, 800, " kWh");
-        }
-
-        // Scenario 1
         let c1Title = "", c1Desc = "", c1DailySavingsKwh = 0, residualSurplusKwh = 0;
         if (type === 'Grid-Tied') {
             c1Title = "1. Grid-Tied (Direct)";
@@ -344,11 +525,90 @@ document.addEventListener('DOMContentLoaded', () => {
         const c1MonthlySavings = Math.min(c1DailySavingsKwh * DAYS_PER_MONTH * rate, bill);
         const c1Offset = dailyKwh > 0 ? (c1DailySavingsKwh / dailyKwh * 100) : 0;
 
-        elements.sc1Title.textContent = c1Title;
-        elements.sc1Desc.textContent = c1Desc;
-        elements.sc1Monthly.textContent = formatPHP(c1MonthlySavings);
-        elements.sc1Offset.textContent = Math.min(c1Offset, 100).toFixed(1) + "% Bill Offset";
-        elements.sc1Yearly.textContent = "Est. " + formatPHP(c1MonthlySavings * 12).split('.')[0] + " / year";
+        let c2MonthlySavings = 0, c2Offset = 0;
+        if (type !== 'Off-Grid' && enableNetMetering) {
+            const c2GrossMonthly = (c1DailySavingsKwh * DAYS_PER_MONTH * rate) + (residualSurplusKwh * DAYS_PER_MONTH * genChargeRate);
+            c2MonthlySavings = Math.min(c2GrossMonthly, bill);
+            c2Offset = dailyKwh > 0 ? (effectiveDailySolarKwh / dailyKwh * 100) : 0;
+        }
+
+        const costPerKwp = getCostPerKwp(scale, displayKwp);
+        const estimatedSystemCost = displayKwp * costPerKwp;
+        const annualSavings = c1MonthlySavings * 12;
+        const paybackYears = annualSavings > 0 ? estimatedSystemCost / annualSavings : 0;
+        const totalLifetimeSavings = annualSavings * SYSTEM_LIFESPAN_YEARS;
+        const roi = estimatedSystemCost > 0 ? ((totalLifetimeSavings - estimatedSystemCost) / estimatedSystemCost * 100) : 0;
+
+        const isSpaceLimited = numPanelsRequired > cappedPanelsPossible;
+        const batteryConfig = type !== 'Grid-Tied' ? numBatt + 'x ' + batteryUnitLabel + ' (' + batteryCapacityTotal.toFixed(1) + ' kWh)' : 'None';
+
+        return {
+            displayKwp, displayPanels, displayArea, monthlyKwh, dailyKwh,
+            effectiveDailySolarKwh, directConsumedKwh, surplusSolarKwh,
+            batteryCapacityTotal, numBatt, batteryUnitLabel, usableBatteryKwh, batteryShiftedKwh,
+            c1Title, c1Desc, c1DailySavingsKwh, c1MonthlySavings, c1Offset, residualSurplusKwh,
+            c2MonthlySavings, c2Offset,
+            estimatedSystemCost, costPerKwp, paybackYears, roi, annualSavings, totalLifetimeSavings,
+            batteryConfig, isSpaceLimited, numPanelsRequired, cappedPanelsPossible
+        };
+    }
+
+    // ==================== MAIN CALCULATION (DOM WRAPPER) ====================
+    function calculate() {
+        const scale = elements.projectScale.value;
+        const type = elements.systemType.value;
+        const bill = Math.max(0, parseFloat(elements.bill.value) || 0);
+        const rate = Math.max(0, parseFloat(elements.rate.value) || 0);
+        const solarTargetPct = type === 'Off-Grid' ? 100 : parseInt(elements.solarTarget.value);
+        const area = Math.max(0, parseFloat(elements.area.value) || 0);
+        const wattage = Math.max(100, parseFloat(elements.wattage.value) || 620);
+
+        let daytimeLoadPct;
+        if (scale === 'Residential') {
+            daytimeLoadPct = parseInt(elements.daytimeLoad.value);
+        } else {
+            const shiftToDaytimeMap = { 1: 85, 2: 55, 3: 40 };
+            daytimeLoadPct = shiftToDaytimeMap[currentShift] || 55;
+        }
+
+        const backupHours = parseInt(elements.backupHours.value);
+        const enableNetMetering = elements.enableNetMetering.checked;
+        const genChargeRate = Math.max(0, parseFloat(elements.genCharge.value) || 0);
+
+        // Build params for pure computation
+        const params = { scale, type, bill, rate, solarTargetPct, area, wattage, daytimeLoadPct, backupHours, enableNetMetering, genChargeRate };
+        const r = computeSolar(params);
+
+        // Update visual labels
+        elements.displayProjectScale.textContent = scale + " Project";
+        elements.solarTargetVal.textContent = solarTargetPct;
+        elements.daytimeLoadVal.textContent = daytimeLoadPct;
+        elements.backupHoursVal.textContent = backupHours;
+
+        // Animate metric values
+        const prevCapacity = parseFloat(elements.resCapacity.textContent) || 0;
+        const prevPanels = parseFloat(elements.resPanels.textContent) || 0;
+        const prevArea = parseFloat(elements.resArea.textContent) || 0;
+
+        animateValue(elements.resCapacity, prevCapacity, r.displayKwp, 800, " kWp");
+        animateValue(elements.resPanels, prevPanels, r.displayPanels, 800, "");
+        animateValue(elements.resArea, prevArea, r.displayArea, 800, " m²");
+
+        // Battery storage card
+        if (type === 'Grid-Tied') {
+            elements.resStorageCard.classList.add('hidden');
+        } else {
+            elements.resStorageCard.classList.remove('hidden');
+            const prevStorage = parseFloat(elements.resStorage.textContent) || 0;
+            animateValue(elements.resStorage, prevStorage, r.batteryCapacityTotal, 800, " kWh");
+        }
+
+        // Scenario 1
+        elements.sc1Title.textContent = r.c1Title;
+        elements.sc1Desc.textContent = r.c1Desc;
+        elements.sc1Monthly.textContent = formatPHP(r.c1MonthlySavings);
+        elements.sc1Offset.textContent = Math.min(r.c1Offset, 100).toFixed(1) + "% Bill Offset";
+        elements.sc1Yearly.textContent = "Est. " + formatPHP(r.c1MonthlySavings * 12).split('.')[0] + " / year";
 
         // Scenario 2
         if (type === 'Off-Grid') {
@@ -367,61 +627,44 @@ document.addEventListener('DOMContentLoaded', () => {
             elements.sc2OffGrid.classList.add('hidden');
             elements.detSurplusRow.classList.remove('hidden');
 
-            const c2GrossMonthly = (c1DailySavingsKwh * DAYS_PER_MONTH * rate) + (residualSurplusKwh * DAYS_PER_MONTH * genChargeRate);
-            const c2MonthlySavings = Math.min(c2GrossMonthly, bill);
-            const c2Offset = dailyKwh > 0 ? (effectiveDailySolarKwh / dailyKwh * 100) : 0;
-
-            elements.sc2Monthly.textContent = formatPHP(c2MonthlySavings);
-            elements.sc2Offset.textContent = Math.min(c2Offset, 100).toFixed(1) + "% Total Offset";
-            elements.sc2Yearly.textContent = "Est. " + formatPHP(c2MonthlySavings * 12).split('.')[0] + " / year";
+            elements.sc2Monthly.textContent = formatPHP(r.c2MonthlySavings);
+            elements.sc2Offset.textContent = Math.min(r.c2Offset, 100).toFixed(1) + "% Total Offset";
+            elements.sc2Yearly.textContent = "Est. " + formatPHP(r.c2MonthlySavings * 12).split('.')[0] + " / year";
         }
 
-        // ROI
-        const costPerKwp = getCostPerKwp(scale, displayKwp);
-        const estimatedSystemCost = displayKwp * costPerKwp;
-        const annualSavings = c1MonthlySavings * 12;
-        const paybackYears = annualSavings > 0 ? estimatedSystemCost / annualSavings : 0;
-        const totalLifetimeSavings = annualSavings * SYSTEM_LIFESPAN_YEARS;
-        const roi = estimatedSystemCost > 0 ? ((totalLifetimeSavings - estimatedSystemCost) / estimatedSystemCost * 100) : 0;
-
-        if (elements.resSystemCost) {
-            elements.resSystemCost.textContent = formatPHPShort(estimatedSystemCost);
-        }
-        if (elements.resPayback) {
-            elements.resPayback.textContent = paybackYears > 0 ? paybackYears.toFixed(1) + " years" : "N/A";
-        }
-        if (elements.resROI) {
-            elements.resROI.textContent = roi > 0 ? roi.toFixed(0) + "%" : "N/A";
-        }
+        // ROI display
+        if (elements.resSystemCost) elements.resSystemCost.textContent = formatPHPShort(r.estimatedSystemCost);
+        if (elements.resPayback) elements.resPayback.textContent = r.paybackYears > 0 ? r.paybackYears.toFixed(1) + " years" : "N/A";
+        if (elements.resROI) elements.resROI.textContent = r.roi > 0 ? r.roi.toFixed(0) + "%" : "N/A";
 
         // Store results for report
         window.solarCalcResults = {
             scale, type,
-            systemCapacity: displayKwp,
-            numPanels: displayPanels,
-            areaUsed: displayArea,
+            systemCapacity: r.displayKwp,
+            numPanels: r.displayPanels,
+            areaUsed: r.displayArea,
             monthlyBill: bill, rate,
-            monthlyGeneration: effectiveDailySolarKwh * DAYS_PER_MONTH,
-            monthlySavings: c1MonthlySavings,
-            annualSavings,
-            billOffset: Math.min(c1Offset, 100),
-            estimatedSystemCost, costPerKwp,
-            paybackYears, roi,
-            lifetimeSavings: totalLifetimeSavings,
-            batteryConfig: type !== 'Grid-Tied' ? `${numBatt}x ${batteryUnitLabel}` : 'None'
+            monthlyGeneration: r.effectiveDailySolarKwh * DAYS_PER_MONTH,
+            monthlySavings: r.c1MonthlySavings,
+            annualSavings: r.annualSavings,
+            billOffset: Math.min(r.c1Offset, 100),
+            estimatedSystemCost: r.estimatedSystemCost, costPerKwp: r.costPerKwp,
+            paybackYears: r.paybackYears, roi: r.roi,
+            lifetimeSavings: r.totalLifetimeSavings,
+            batteryConfig: r.batteryConfig
         };
 
         // Energy flow details
-        elements.detMonthlyGen.textContent = (effectiveDailySolarKwh * DAYS_PER_MONTH).toFixed(1) + " kWh";
-        elements.detDirectCons.textContent = (directConsumedKwh * DAYS_PER_MONTH).toFixed(1) + " kWh";
-        elements.detSurplus.textContent = (surplusSolarKwh * DAYS_PER_MONTH).toFixed(1) + " kWh";
-        elements.detMonthlyReq.textContent = monthlyKwh.toFixed(1) + " kWh";
+        elements.detMonthlyGen.textContent = (r.effectiveDailySolarKwh * DAYS_PER_MONTH).toFixed(1) + " kWh";
+        elements.detDirectCons.textContent = (r.directConsumedKwh * DAYS_PER_MONTH).toFixed(1) + " kWh";
+        elements.detSurplus.textContent = (r.surplusSolarKwh * DAYS_PER_MONTH).toFixed(1) + " kWh";
+        elements.detMonthlyReq.textContent = r.monthlyKwh.toFixed(1) + " kWh";
 
-        // Battery assessment box (using CSS classes instead of inline styles)
+        // Battery assessment box
         if (type === 'Grid-Tied') {
             elements.detConfigTitle.textContent = "Battery Recommendation";
-            if (surplusSolarKwh > 0) {
-                const suggestedBattery = findOptimalBattery(surplusSolarKwh, scale);
+            if (r.surplusSolarKwh > 0) {
+                const suggestedBattery = findOptimalBattery(r.surplusSolarKwh, scale);
                 elements.detConfigContent.innerHTML = `<p class="config-detail">Adding <strong>${suggestedBattery.numUnits}x ${suggestedBattery.label}</strong> (${suggestedBattery.totalKwh.toFixed(1)} kWh total) would capture surplus solar for nighttime use.</p>`;
             } else {
                 elements.detConfigContent.innerHTML = `<p class="config-success">Your daytime load consumes all solar. Battery is optional for backup only.</p>`;
@@ -431,41 +674,131 @@ document.addEventListener('DOMContentLoaded', () => {
             elements.detConfigContent.innerHTML = `
                 <ul class="config-list">
                     <li>Target Backup: <strong>${backupHours} hours</strong></li>
-                    <li>Total Battery Units: <strong>${numBatt}x ${batteryUnitLabel}</strong></li>
-                    <li>Total Capacity: <strong>${batteryCapacityTotal.toFixed(1)} kWh</strong></li>
+                    <li>Total Battery Units: <strong>${r.numBatt}x ${r.batteryUnitLabel}</strong></li>
+                    <li>Total Capacity: <strong>${r.batteryCapacityTotal.toFixed(1)} kWh</strong></li>
                 </ul>
             `;
         }
 
-        // Status alerts (using CSS classes)
+        // Status alerts
         elements.statusAlerts.innerHTML = '';
 
         let actualCat = "";
-        if (displayKwp <= 20) actualCat = "Residential";
-        else if (displayKwp <= 300) actualCat = "C&I";
+        if (r.displayKwp <= 20) actualCat = "Residential";
+        else if (r.displayKwp <= 300) actualCat = "C&I";
         else actualCat = "Utility Scale";
 
         if (scale !== actualCat) {
             const alert = document.createElement('div');
             alert.className = 'status-alert scale-alert';
-            alert.innerHTML = `<strong>Note:</strong> System sized as <strong>${actualCat}</strong> (${displayKwp.toFixed(1)} kWp). Consider switching Project Scale to <strong>${actualCat}</strong> for optimized battery options and pricing.`;
+            alert.innerHTML = `<strong>Note:</strong> System sized as <strong>${actualCat}</strong> (${r.displayKwp.toFixed(1)} kWp). Consider switching Project Scale to <strong>${actualCat}</strong> for optimized battery options and pricing.`;
             elements.statusAlerts.appendChild(alert);
         }
 
-        if (numPanelsRequired > cappedPanelsPossible) {
+        if (r.isSpaceLimited) {
             const warning = document.createElement('div');
             warning.className = 'status-alert space-warning';
-            const offsetMax = dailyKwh > 0 ? (effectiveDailySolarKwh / dailyKwh * 100) : 0;
-            warning.innerHTML = `<strong>Space limited:</strong> Your ${area} sqm area fits ${cappedPanelsPossible} panels (${offsetMax.toFixed(1)}% offset). To reach ${solarTargetPct}% target, try increasing area to <strong>${(numPanelsRequired * PANEL_SIZE_SQM).toFixed(0)} sqm</strong> or reducing your target.`;
+            const offsetMax = r.dailyKwh > 0 ? (r.effectiveDailySolarKwh / r.dailyKwh * 100) : 0;
+            warning.innerHTML = `<strong>Space limited:</strong> Your ${area} sqm area fits ${r.cappedPanelsPossible} panels (${offsetMax.toFixed(1)}% offset). To reach ${solarTargetPct}% target, try increasing area to <strong>${(r.numPanelsRequired * PANEL_SIZE_SQM).toFixed(0)} sqm</strong> or reducing your target.`;
             elements.statusAlerts.appendChild(warning);
         }
 
-        // Save to localStorage
+        // Update Phase 6 features
+        if (savingsChart) savingsChart.update({ annualSavings: r.annualSavings, estimatedSystemCost: r.estimatedSystemCost, paybackYears: r.paybackYears });
+        updateComparisonTable(params);
+        updateSensitivityAnalysis(params);
+
         saveToLocalStorage();
     }
 
-    // Debounced version for input events
     const debouncedCalculate = debounce(calculate, DEBOUNCE_MS);
+
+    // ==================== SYSTEM COMPARISON TABLE ====================
+    function updateComparisonTable(baseParams) {
+        const tbody = document.getElementById('comparisonBody');
+        if (!tbody) return;
+
+        const types = ['Grid-Tied', 'Hybrid', 'Off-Grid'];
+        const results = {};
+
+        types.forEach(t => {
+            const p = Object.assign({}, baseParams, { type: t });
+            if (t === 'Off-Grid') p.solarTargetPct = 100;
+            results[t] = computeSolar(p);
+        });
+
+        const rows = [
+            { label: 'System Capacity', fn: r => r.displayKwp.toFixed(2) + ' kWp' },
+            { label: 'Panels Required', fn: r => r.displayPanels.toString() },
+            { label: 'Area Used', fn: r => r.displayArea.toFixed(1) + ' m\u00B2' },
+            { label: 'Est. System Cost', fn: r => formatPHPShort(r.estimatedSystemCost) },
+            { label: 'Monthly Savings', fn: r => formatPHP(r.c1MonthlySavings) },
+            { label: 'Payback Period', fn: r => r.paybackYears > 0 ? r.paybackYears.toFixed(1) + ' years' : 'N/A' },
+            { label: '15-Year ROI', fn: r => r.roi > 0 ? r.roi.toFixed(0) + '%' : 'N/A' },
+            { label: 'Battery Config', fn: r => r.batteryConfig }
+        ];
+
+        tbody.innerHTML = rows.map(row => {
+            return '<tr>' +
+                '<td class="comp-metric-label">' + row.label + '</td>' +
+                types.map(t => {
+                    const isActive = t === baseParams.type;
+                    return '<td class="' + (isActive ? 'comp-active' : '') + '">' + row.fn(results[t]) + '</td>';
+                }).join('') +
+            '</tr>';
+        }).join('');
+
+        // Highlight active column header
+        const colIds = { 'Grid-Tied': 'compColGridTied', 'Hybrid': 'compColHybrid', 'Off-Grid': 'compColOffGrid' };
+        types.forEach(t => {
+            const el = document.getElementById(colIds[t]);
+            if (el) el.classList.toggle('comp-active-header', t === baseParams.type);
+        });
+    }
+
+    // ==================== SENSITIVITY ANALYSIS ====================
+    function updateSensitivityAnalysis(baseParams) {
+        const gridEl = document.getElementById('sensitivityGrid');
+        if (!gridEl) return;
+
+        const baseResults = computeSolar(baseParams);
+
+        const variables = [
+            { name: 'Electricity Rate', key: 'rate', variations: [-40, -20, 0, 20, 40], format: v => '₱' + v.toFixed(1) + '/kWh' },
+            { name: 'Monthly Bill', key: 'bill', variations: [-40, -20, 0, 20, 40], format: v => formatPHPShort(v) },
+            { name: 'Available Area', key: 'area', variations: [-50, -25, 0, 25, 50], format: v => v.toFixed(0) + ' sqm' }
+        ];
+
+        gridEl.innerHTML = variables.map(variable => {
+            const tableRows = variable.variations.map(pctChange => {
+                const modParams = Object.assign({}, baseParams);
+                modParams[variable.key] = baseParams[variable.key] * (1 + pctChange / 100);
+                if (modParams[variable.key] < 0) modParams[variable.key] = 0;
+                const res = computeSolar(modParams);
+
+                const isBaseline = pctChange === 0;
+                const isBetter = res.roi > baseResults.roi + 0.5;
+                const isWorse = res.roi < baseResults.roi - 0.5;
+                const cls = isBaseline ? 'sensitivity-baseline' : (isBetter ? 'sensitivity-better' : (isWorse ? 'sensitivity-worse' : ''));
+
+                return `<tr class="${cls}">
+                    <td>${pctChange === 0 ? 'Baseline' : (pctChange > 0 ? '+' : '') + pctChange + '%'}</td>
+                    <td>${variable.format(modParams[variable.key])}</td>
+                    <td>${res.paybackYears > 0 ? res.paybackYears.toFixed(1) + 'y' : 'N/A'}</td>
+                    <td>${res.roi > 0 ? res.roi.toFixed(0) + '%' : 'N/A'}</td>
+                    <td>${formatPHPShort(res.c1MonthlySavings)}</td>
+                </tr>`;
+            }).join('');
+
+            return `<div class="sensitivity-card">
+                <h5>${variable.name}</h5>
+                <table class="sensitivity-table">
+                    <thead><tr><th>Change</th><th>Value</th><th>Payback</th><th>ROI</th><th>Monthly</th></tr></thead>
+                    <tbody>${tableRows}</tbody>
+                </table>
+            </div>`;
+        }).join('');
+    }
 
     // ==================== LOCAL STORAGE ====================
     function saveToLocalStorage() {
@@ -481,63 +814,47 @@ document.addEventListener('DOMContentLoaded', () => {
             backupHours: elements.backupHours.value,
             enableNetMetering: elements.enableNetMetering.checked,
             genCharge: elements.genCharge.value,
-            currentShift: currentShift
+            currentShift
         };
         try {
             localStorage.setItem('solarCalcState', JSON.stringify(state));
-        } catch (e) { /* quota exceeded, ignore */ }
+        } catch (e) { /* quota exceeded or private mode */ }
     }
 
     function loadFromLocalStorage() {
         try {
-            const saved = JSON.parse(localStorage.getItem('solarCalcState'));
+            const saved = localStorage.getItem('solarCalcState');
             if (!saved) return false;
-
-            elements.projectScale.value = saved.projectScale || DEFAULTS.projectScale;
-            elements.systemType.value = saved.systemType || DEFAULTS.systemType;
-            elements.bill.value = saved.bill || DEFAULTS.bill;
-            elements.rate.value = saved.rate || DEFAULTS.rate;
-            elements.solarTarget.value = saved.solarTarget || DEFAULTS.solarTarget;
-            elements.area.value = saved.area || DEFAULTS.area;
-            elements.wattage.value = saved.wattage || DEFAULTS.wattage;
-            elements.daytimeLoad.value = saved.daytimeLoad || DEFAULTS.daytimeLoad;
-            elements.backupHours.value = saved.backupHours || DEFAULTS.backupHours;
-            elements.enableNetMetering.checked = saved.enableNetMetering || false;
-            elements.genCharge.value = saved.genCharge || DEFAULTS.genCharge;
-            currentShift = saved.currentShift || 1;
-
+            const state = JSON.parse(saved);
+            if (state.projectScale) elements.projectScale.value = state.projectScale;
+            if (state.systemType) elements.systemType.value = state.systemType;
+            if (state.bill) elements.bill.value = state.bill;
+            if (state.rate) elements.rate.value = state.rate;
+            if (state.solarTarget) elements.solarTarget.value = state.solarTarget;
+            if (state.area) elements.area.value = state.area;
+            if (state.wattage) elements.wattage.value = state.wattage;
+            if (state.daytimeLoad) elements.daytimeLoad.value = state.daytimeLoad;
+            if (state.backupHours) elements.backupHours.value = state.backupHours;
+            if (state.enableNetMetering !== undefined) elements.enableNetMetering.checked = state.enableNetMetering;
+            if (state.genCharge) elements.genCharge.value = state.genCharge;
+            if (state.currentShift) currentShift = state.currentShift;
             return true;
-        } catch (e) {
-            return false;
-        }
+        } catch { return false; }
     }
 
     function loadFromURL() {
         const params = new URLSearchParams(window.location.search);
         if (params.size === 0) return false;
-
-        const mapping = {
-            scale: 'projectScale', type: 'systemType', bill: 'bill',
-            rate: 'rate', target: 'solarTarget', area: 'area',
-            watt: 'wattage', daytime: 'daytimeLoad', backup: 'backupHours',
-            netmeter: null, gencharge: 'genCharge'
-        };
-
-        let loaded = false;
-        for (const [param, elKey] of Object.entries(mapping)) {
+        const map = { scale: 'projectScale', type: 'systemType', bill: 'bill', rate: 'rate', target: 'solarTarget', area: 'area', watt: 'wattage', daytime: 'daytimeLoad', backup: 'backupHours', gencharge: 'genCharge' };
+        let found = false;
+        for (const [param, elKey] of Object.entries(map)) {
             const val = params.get(param);
-            if (val === null) continue;
-            loaded = true;
-            if (param === 'netmeter') {
-                elements.enableNetMetering.checked = val === '1';
-            } else if (elements[elKey]) {
-                elements[elKey].value = val;
-            }
+            if (val && elements[elKey]) { elements[elKey].value = val; found = true; }
         }
-        return loaded;
+        if (params.get('netmeter') === '1') { elements.enableNetMetering.checked = true; found = true; }
+        return found;
     }
 
-    // ==================== SHARE URL ====================
     function getShareURL() {
         const params = new URLSearchParams();
         params.set('scale', elements.projectScale.value);
@@ -555,14 +872,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ==================== EVENT LISTENERS ====================
-    // Form elements — use debounced calculate for text inputs, immediate for selects/checkboxes
     const immediateElements = [elements.projectScale, elements.systemType, elements.enableNetMetering];
     const debouncedElements = [elements.bill, elements.rate, elements.area, elements.wattage, elements.genCharge];
     const rangeElements = [elements.solarTarget, elements.daytimeLoad, elements.backupHours];
 
-    immediateElements.forEach(el => {
-        el.addEventListener('change', calculate);
-    });
+    immediateElements.forEach(el => { el.addEventListener('change', calculate); });
 
     debouncedElements.forEach(el => {
         el.addEventListener('input', debouncedCalculate);
@@ -575,7 +889,6 @@ document.addEventListener('DOMContentLoaded', () => {
         el.addEventListener('change', calculate);
     });
 
-    // Project scale toggle
     elements.projectScale.addEventListener('change', () => {
         const scale = elements.projectScale.value;
         if (scale === 'Residential') {
@@ -588,7 +901,6 @@ document.addEventListener('DOMContentLoaded', () => {
         updateBatteryOptions();
     });
 
-    // System type toggle
     elements.systemType.addEventListener('change', (e) => {
         const type = e.target.value;
         if (type === 'Off-Grid') {
@@ -601,7 +913,6 @@ document.addEventListener('DOMContentLoaded', () => {
             elements.offGridInfo.classList.add('hidden');
             elements.solarTarget.disabled = false;
         }
-
         if (type === 'Grid-Tied') {
             elements.batterySection.classList.add('hidden');
         } else {
@@ -609,50 +920,32 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Net metering toggle
     elements.enableNetMetering.addEventListener('change', (e) => {
-        if (e.target.checked) {
-            elements.genChargeGroup.classList.remove('hidden');
-        } else {
-            elements.genChargeGroup.classList.add('hidden');
-        }
+        if (e.target.checked) { elements.genChargeGroup.classList.remove('hidden'); }
+        else { elements.genChargeGroup.classList.add('hidden'); }
     });
 
-    // Clear buttons
     clearButtons.forEach(btn => {
         btn.addEventListener('click', (e) => {
             const targetId = e.currentTarget.getAttribute('data-target');
-            if (elements[targetId]) {
-                elements[targetId].value = '';
-                calculate();
-            }
+            if (elements[targetId]) { elements[targetId].value = ''; calculate(); }
         });
     });
 
-    // Shift selector
     shiftOptions.forEach(btn => {
         btn.addEventListener('click', (e) => {
             const shiftValue = parseInt(e.currentTarget.getAttribute('data-shift'));
             currentShift = shiftValue;
-            shiftOptions.forEach(opt => {
-                opt.classList.remove('active');
-                opt.setAttribute('aria-checked', 'false');
-            });
+            shiftOptions.forEach(opt => { opt.classList.remove('active'); opt.setAttribute('aria-checked', 'false'); });
             e.currentTarget.classList.add('active');
             e.currentTarget.setAttribute('aria-checked', 'true');
             calculate();
         });
-
-        // Keyboard support for shift buttons
         btn.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                btn.click();
-            }
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); btn.click(); }
         });
     });
 
-    // Reset to defaults
     if (elements.btnReset) {
         elements.btnReset.addEventListener('click', () => {
             elements.projectScale.value = DEFAULTS.projectScale;
@@ -668,33 +961,20 @@ document.addEventListener('DOMContentLoaded', () => {
             elements.enableNetMetering.checked = DEFAULTS.enableNetMetering;
             elements.genCharge.value = DEFAULTS.genCharge;
             currentShift = 1;
-
-            // Reset UI visibility
             elements.daytimeLoadGroup.classList.remove('hidden');
             elements.shiftGroup.classList.add('hidden');
             elements.batterySection.classList.add('hidden');
             elements.offGridInfo.classList.add('hidden');
             elements.genChargeGroup.classList.add('hidden');
-
-            shiftOptions.forEach(opt => {
-                opt.classList.remove('active');
-                opt.setAttribute('aria-checked', 'false');
-            });
-            if (shiftOptions[0]) {
-                shiftOptions[0].classList.add('active');
-                shiftOptions[0].setAttribute('aria-checked', 'true');
-            }
-
-            // Update slider visuals
+            shiftOptions.forEach(opt => { opt.classList.remove('active'); opt.setAttribute('aria-checked', 'false'); });
+            if (shiftOptions[0]) { shiftOptions[0].classList.add('active'); shiftOptions[0].setAttribute('aria-checked', 'true'); }
             document.querySelectorAll('input[type="range"]').forEach(updateRangeBackground);
-
             updateBatteryOptions();
             calculate();
             localStorage.removeItem('solarCalcState');
         });
     }
 
-    // Share button
     const btnShare = document.getElementById('btnShare');
     if (btnShare) {
         btnShare.addEventListener('click', async () => {
@@ -703,9 +983,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 await navigator.clipboard.writeText(url);
                 btnShare.textContent = 'Link Copied!';
                 setTimeout(() => { btnShare.textContent = 'Share Config'; }, 2000);
-            } catch {
-                prompt('Copy this link:', url);
-            }
+            } catch { prompt('Copy this link:', url); }
         });
     }
 
@@ -715,19 +993,14 @@ document.addEventListener('DOMContentLoaded', () => {
         rangeInput.style.background = `linear-gradient(to right, var(--primary) 0%, var(--primary-dark) ${value}%, rgba(255,255,255,0.1) ${value}%, rgba(255,255,255,0.1) 100%)`;
     }
 
-    document.querySelectorAll('input[type="range"]').forEach(slider => {
+    document.querySelectorAll('.sidebar input[type="range"]').forEach(slider => {
         updateRangeBackground(slider);
         const handler = (e) => {
             updateRangeBackground(e.target);
             e.target.setAttribute('aria-valuenow', e.target.value);
-            // Direct label sync for immediate feedback
-            if (e.target === elements.daytimeLoad) {
-                elements.daytimeLoadVal.textContent = e.target.value;
-            } else if (e.target === elements.solarTarget) {
-                elements.solarTargetVal.textContent = e.target.value;
-            } else if (e.target === elements.backupHours) {
-                elements.backupHoursVal.textContent = e.target.value;
-            }
+            if (e.target === elements.daytimeLoad) { elements.daytimeLoadVal.textContent = e.target.value; }
+            else if (e.target === elements.solarTarget) { elements.solarTargetVal.textContent = e.target.value; }
+            else if (e.target === elements.backupHours) { elements.backupHoursVal.textContent = e.target.value; }
         };
         slider.addEventListener('input', handler);
         slider.addEventListener('change', handler);
@@ -744,7 +1017,6 @@ document.addEventListener('DOMContentLoaded', () => {
             sidebarOverlay.classList.toggle('active');
             document.body.style.overflow = sidebar.classList.contains('active') ? 'hidden' : '';
         });
-
         sidebarOverlay.addEventListener('click', () => {
             sidebar.classList.remove('active');
             sidebarOverlay.classList.remove('active');
@@ -779,26 +1051,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (modalClose) modalClose.addEventListener('click', closeModal);
     if (btnCloseSuccess) btnCloseSuccess.addEventListener('click', closeModal);
-
-    reportModal?.addEventListener('click', (e) => {
-        if (e.target === reportModal) closeModal();
-    });
+    reportModal?.addEventListener('click', (e) => { if (e.target === reportModal) closeModal(); });
 
     if (reportForm) {
         reportForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-
-            // Rate limiting (5 second cooldown)
             const now = Date.now();
-            if (now - lastSubmitTime < 5000) {
-                alert('Please wait a moment before submitting again.');
-                return;
-            }
-
-            // Honeypot check
+            if (now - lastSubmitTime < 5000) { alert('Please wait a moment before submitting again.'); return; }
             const honeypot = document.getElementById('website_url');
             if (honeypot && honeypot.value) return;
-
             lastSubmitTime = now;
 
             const customerInfo = {
@@ -814,10 +1075,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             try {
                 const results = window.solarCalcResults || {};
-
                 const templateParams = {
-                    to_name: customerInfo.name,
-                    to_email: customerInfo.email,
+                    to_name: customerInfo.name, to_email: customerInfo.email,
                     customer_phone: customerInfo.phone || 'Not provided',
                     customer_location: customerInfo.location || 'Not provided',
                     system_capacity: (results.systemCapacity || 0).toFixed(2) + ' kWp',
@@ -834,19 +1093,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 };
 
                 if (window.emailjs && EMAILJS_CONFIG.publicKey !== 'YOUR_PUBLIC_KEY') {
-                    await emailjs.send(
-                        EMAILJS_CONFIG.serviceId,
-                        EMAILJS_CONFIG.customerTemplateId,
-                        templateParams
-                    );
+                    await emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.customerTemplateId, templateParams);
                 } else {
                     console.warn('EmailJS not configured. Report data logged to console.');
                     console.log('Report for:', customerInfo.name, templateParams);
                 }
-
                 reportForm.classList.add('hidden');
                 reportSuccess.classList.remove('hidden');
-
             } catch (error) {
                 console.error('Error sending report:', error);
                 alert('Error sending report. Please try again or contact support.');
@@ -858,12 +1111,315 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // ==================== SETUP WIZARD ====================
+    const wizardModal = document.getElementById('wizardModal');
+    const btnWizard = document.getElementById('btnWizard');
+    const wizardClose = document.getElementById('wizardClose');
+    const wizPrev = document.getElementById('wizPrev');
+    const wizNext = document.getElementById('wizNext');
+    const wizFinish = document.getElementById('wizFinish');
+    const wizardSteps = document.querySelectorAll('.wizard-step');
+    const wizardDots = document.querySelectorAll('.wizard-dot');
+    const wizardProgressBar = document.getElementById('wizardProgressBar');
+    const WIZ_TOTAL_STEPS = 6;
+    let wizCurrentStep = 1;
+
+    const wizardState = {
+        projectScale: 'Residential',
+        systemType: 'Grid-Tied',
+        bill: 15000, rate: 13.5,
+        area: 50, wattage: 620,
+        solarTarget: 100, daytimeLoad: 40,
+        backupHours: 4, enableNetMetering: false
+    };
+
+    function openWizard() {
+        if (!wizardModal) return;
+        // Pre-fill from current calculator values
+        wizardState.projectScale = elements.projectScale.value;
+        wizardState.systemType = elements.systemType.value;
+        wizardState.bill = parseFloat(elements.bill.value) || 15000;
+        wizardState.rate = parseFloat(elements.rate.value) || 13.5;
+        wizardState.area = parseFloat(elements.area.value) || 50;
+        wizardState.wattage = parseFloat(elements.wattage.value) || 620;
+        wizardState.solarTarget = parseInt(elements.solarTarget.value) || 100;
+        wizardState.daytimeLoad = parseInt(elements.daytimeLoad.value) || 40;
+        wizardState.backupHours = parseInt(elements.backupHours.value) || 4;
+        wizardState.enableNetMetering = elements.enableNetMetering.checked;
+
+        // Populate wizard inputs
+        const wizBill = document.getElementById('wizBill');
+        const wizRate = document.getElementById('wizRate');
+        const wizArea = document.getElementById('wizArea');
+        const wizWattage = document.getElementById('wizWattage');
+        const wizSolarTarget = document.getElementById('wizSolarTarget');
+        const wizDaytimeLoad = document.getElementById('wizDaytimeLoad');
+        const wizBackupHours = document.getElementById('wizBackupHours');
+        const wizNetMetering = document.getElementById('wizNetMetering');
+
+        if (wizBill) wizBill.value = wizardState.bill;
+        if (wizRate) wizRate.value = wizardState.rate;
+        if (wizArea) wizArea.value = wizardState.area;
+        if (wizWattage) wizWattage.value = wizardState.wattage;
+        if (wizSolarTarget) wizSolarTarget.value = wizardState.solarTarget;
+        if (wizDaytimeLoad) wizDaytimeLoad.value = wizardState.daytimeLoad;
+        if (wizBackupHours) wizBackupHours.value = wizardState.backupHours;
+        if (wizNetMetering) wizNetMetering.checked = wizardState.enableNetMetering;
+
+        // Update wizard slider labels
+        const wizSolarTargetVal = document.getElementById('wizSolarTargetVal');
+        const wizDaytimeLoadVal = document.getElementById('wizDaytimeLoadVal');
+        const wizBackupHoursVal = document.getElementById('wizBackupHoursVal');
+        if (wizSolarTargetVal) wizSolarTargetVal.textContent = wizardState.solarTarget;
+        if (wizDaytimeLoadVal) wizDaytimeLoadVal.textContent = wizardState.daytimeLoad;
+        if (wizBackupHoursVal) wizBackupHoursVal.textContent = wizardState.backupHours;
+
+        // Pre-select option buttons
+        document.querySelectorAll('#wizStep1 .wizard-option').forEach(btn => {
+            btn.classList.toggle('selected', btn.getAttribute('data-value') === wizardState.projectScale);
+        });
+        document.querySelectorAll('#wizStep2 .wizard-option').forEach(btn => {
+            btn.classList.toggle('selected', btn.getAttribute('data-value') === wizardState.systemType);
+        });
+
+        wizCurrentStep = 1;
+        goToWizStep(1);
+        wizardModal.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeWizard() {
+        if (!wizardModal) return;
+        wizardModal.classList.remove('active');
+        document.body.style.overflow = '';
+    }
+
+    function goToWizStep(n) {
+        wizCurrentStep = n;
+        wizardSteps.forEach((step, i) => { step.classList.toggle('active', i === n - 1); });
+        wizardDots.forEach((dot, i) => {
+            dot.classList.remove('active', 'completed');
+            if (i < n - 1) dot.classList.add('completed');
+            if (i === n - 1) dot.classList.add('active');
+        });
+        if (wizardProgressBar) wizardProgressBar.style.setProperty('--wizard-progress', ((n / WIZ_TOTAL_STEPS) * 100) + '%');
+        if (wizPrev) wizPrev.disabled = n === 1;
+        if (wizNext) wizNext.classList.toggle('hidden', n === WIZ_TOTAL_STEPS);
+        if (wizFinish) wizFinish.classList.toggle('hidden', n !== WIZ_TOTAL_STEPS);
+
+        // Step 5: Show/hide battery group based on system type
+        if (n === 5) {
+            const battGroup = document.getElementById('wizBatteryGroup');
+            if (battGroup) battGroup.classList.toggle('hidden', wizardState.systemType === 'Grid-Tied');
+            const wizST = document.getElementById('wizSolarTarget');
+            if (wizardState.systemType === 'Off-Grid' && wizST) {
+                wizST.value = 100;
+                wizST.disabled = true;
+                const wizSTV = document.getElementById('wizSolarTargetVal');
+                if (wizSTV) wizSTV.textContent = '100';
+                wizardState.solarTarget = 100;
+            } else if (wizST) {
+                wizST.disabled = false;
+            }
+        }
+
+        // Step 6: Generate summary
+        if (n === WIZ_TOTAL_STEPS) {
+            generateWizardSummary();
+        }
+
+        // Focus first interactive element
+        const activeStep = document.getElementById('wizStep' + n);
+        if (activeStep) {
+            const focusable = activeStep.querySelector('button, input, select, [tabindex]');
+            if (focusable) setTimeout(() => focusable.focus(), 100);
+        }
+    }
+
+    function readWizardInputs() {
+        const wizBill = document.getElementById('wizBill');
+        const wizRate = document.getElementById('wizRate');
+        const wizArea = document.getElementById('wizArea');
+        const wizWattage = document.getElementById('wizWattage');
+        const wizSolarTarget = document.getElementById('wizSolarTarget');
+        const wizDaytimeLoad = document.getElementById('wizDaytimeLoad');
+        const wizBackupHours = document.getElementById('wizBackupHours');
+        const wizNetMetering = document.getElementById('wizNetMetering');
+
+        if (wizBill) wizardState.bill = parseFloat(wizBill.value) || 15000;
+        if (wizRate) wizardState.rate = parseFloat(wizRate.value) || 13.5;
+        if (wizArea) wizardState.area = parseFloat(wizArea.value) || 50;
+        if (wizWattage) wizardState.wattage = parseFloat(wizWattage.value) || 620;
+        if (wizSolarTarget) wizardState.solarTarget = parseInt(wizSolarTarget.value) || 100;
+        if (wizDaytimeLoad) wizardState.daytimeLoad = parseInt(wizDaytimeLoad.value) || 40;
+        if (wizBackupHours) wizardState.backupHours = parseInt(wizBackupHours.value) || 4;
+        if (wizNetMetering) wizardState.enableNetMetering = wizNetMetering.checked;
+    }
+
+    function generateWizardSummary() {
+        readWizardInputs();
+        const summaryEl = document.getElementById('wizardSummary');
+        if (!summaryEl) return;
+
+        const params = {
+            scale: wizardState.projectScale,
+            type: wizardState.systemType,
+            bill: wizardState.bill,
+            rate: wizardState.rate,
+            solarTargetPct: wizardState.systemType === 'Off-Grid' ? 100 : wizardState.solarTarget,
+            area: wizardState.area,
+            wattage: wizardState.wattage,
+            daytimeLoadPct: wizardState.daytimeLoad,
+            backupHours: wizardState.backupHours,
+            enableNetMetering: wizardState.enableNetMetering,
+            genChargeRate: parseFloat(elements.genCharge.value) || 5.5
+        };
+
+        const r = computeSolar(params);
+
+        summaryEl.innerHTML = `
+            <div class="wizard-summary-grid">
+                <div class="wizard-summary-item">
+                    <span class="wizard-summary-label">Project</span>
+                    <span class="wizard-summary-value">${wizardState.projectScale} / ${wizardState.systemType}</span>
+                </div>
+                <div class="wizard-summary-item">
+                    <span class="wizard-summary-label">System Size</span>
+                    <span class="wizard-summary-value">${r.displayKwp.toFixed(2)} kWp (${r.displayPanels} panels)</span>
+                </div>
+                <div class="wizard-summary-item">
+                    <span class="wizard-summary-label">Est. Cost</span>
+                    <span class="wizard-summary-value">${formatPHPShort(r.estimatedSystemCost)}</span>
+                </div>
+                <div class="wizard-summary-item">
+                    <span class="wizard-summary-label">Monthly Savings</span>
+                    <span class="wizard-summary-value highlight-success">${formatPHP(r.c1MonthlySavings)}</span>
+                </div>
+                <div class="wizard-summary-item">
+                    <span class="wizard-summary-label">Payback</span>
+                    <span class="wizard-summary-value">${r.paybackYears > 0 ? r.paybackYears.toFixed(1) + ' years' : 'N/A'}</span>
+                </div>
+                <div class="wizard-summary-item">
+                    <span class="wizard-summary-label">15-Year ROI</span>
+                    <span class="wizard-summary-value highlight-success">${r.roi > 0 ? r.roi.toFixed(0) + '%' : 'N/A'}</span>
+                </div>
+            </div>
+        `;
+    }
+
+    function finishWizard() {
+        readWizardInputs();
+
+        // Transfer values to main calculator
+        elements.projectScale.value = wizardState.projectScale;
+        elements.systemType.value = wizardState.systemType;
+        elements.bill.value = wizardState.bill;
+        elements.rate.value = wizardState.rate;
+        elements.solarTarget.value = wizardState.solarTarget;
+        elements.area.value = wizardState.area;
+        elements.wattage.value = wizardState.wattage;
+        elements.daytimeLoad.value = wizardState.daytimeLoad;
+        elements.backupHours.value = wizardState.backupHours;
+        elements.enableNetMetering.checked = wizardState.enableNetMetering;
+
+        // Update UI visibility based on wizard selections
+        if (wizardState.projectScale === 'Residential') {
+            elements.daytimeLoadGroup.classList.remove('hidden');
+            elements.shiftGroup.classList.add('hidden');
+        } else {
+            elements.daytimeLoadGroup.classList.add('hidden');
+            elements.shiftGroup.classList.remove('hidden');
+        }
+
+        if (wizardState.systemType === 'Off-Grid') {
+            elements.offGridInfo.classList.remove('hidden');
+            elements.solarTarget.disabled = true;
+            elements.solarTarget.value = 100;
+            elements.solarTargetVal.textContent = 100;
+        } else {
+            elements.offGridInfo.classList.add('hidden');
+            elements.solarTarget.disabled = false;
+        }
+
+        if (wizardState.systemType === 'Grid-Tied') {
+            elements.batterySection.classList.add('hidden');
+        } else {
+            elements.batterySection.classList.remove('hidden');
+        }
+
+        if (wizardState.enableNetMetering) {
+            elements.genChargeGroup.classList.remove('hidden');
+        } else {
+            elements.genChargeGroup.classList.add('hidden');
+        }
+
+        // Update slider visuals
+        document.querySelectorAll('.sidebar input[type="range"]').forEach(updateRangeBackground);
+        updateBatteryOptions();
+        closeWizard();
+        calculate();
+    }
+
+    // Wizard event listeners
+    if (btnWizard) btnWizard.addEventListener('click', openWizard);
+    if (wizardClose) wizardClose.addEventListener('click', closeWizard);
+    if (wizardModal) wizardModal.addEventListener('click', (e) => { if (e.target === wizardModal) closeWizard(); });
+
+    if (wizNext) {
+        wizNext.addEventListener('click', () => {
+            readWizardInputs();
+            if (wizCurrentStep < WIZ_TOTAL_STEPS) goToWizStep(wizCurrentStep + 1);
+        });
+    }
+    if (wizPrev) {
+        wizPrev.addEventListener('click', () => {
+            if (wizCurrentStep > 1) goToWizStep(wizCurrentStep - 1);
+        });
+    }
+    if (wizFinish) wizFinish.addEventListener('click', finishWizard);
+
+    // Wizard option buttons (steps 1-2)
+    document.querySelectorAll('.wizard-option').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const field = btn.getAttribute('data-field');
+            const value = btn.getAttribute('data-value');
+            if (field && value) {
+                wizardState[field] = value;
+                btn.closest('.wizard-options').querySelectorAll('.wizard-option').forEach(b => b.classList.remove('selected'));
+                btn.classList.add('selected');
+                // Auto-advance after selection
+                setTimeout(() => {
+                    readWizardInputs();
+                    if (wizCurrentStep < WIZ_TOTAL_STEPS) goToWizStep(wizCurrentStep + 1);
+                }, 300);
+            }
+        });
+    });
+
+    // Wizard slider label sync
+    ['wizSolarTarget', 'wizDaytimeLoad', 'wizBackupHours'].forEach(id => {
+        const slider = document.getElementById(id);
+        const labelEl = document.getElementById(id + 'Val');
+        if (slider && labelEl) {
+            slider.addEventListener('input', () => { labelEl.textContent = slider.value; });
+        }
+    });
+
+    // Wizard keyboard: Escape to close
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && wizardModal && wizardModal.classList.contains('active')) {
+            closeWizard();
+        }
+    });
+
+    // ==================== INITIALIZE SAVINGS CHART ====================
+    const savingsCanvas = document.getElementById('savingsChart');
+    const savingsChart = savingsCanvas ? new SavingsChart(savingsCanvas) : null;
+
     // ==================== INITIALIZATION ====================
-    // Load state: URL params take priority, then localStorage, then defaults
     const loadedFromURL = loadFromURL();
     if (!loadedFromURL) loadFromLocalStorage();
 
-    // Apply loaded UI state
     const initScale = elements.projectScale.value;
     if (initScale !== 'Residential') {
         elements.daytimeLoadGroup.classList.add('hidden');
@@ -883,7 +1439,6 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.genChargeGroup.classList.remove('hidden');
     }
 
-    // Set active shift button
     shiftOptions.forEach(opt => {
         opt.classList.remove('active');
         opt.setAttribute('aria-checked', 'false');
@@ -893,9 +1448,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Update slider visuals
-    document.querySelectorAll('input[type="range"]').forEach(updateRangeBackground);
-
+    document.querySelectorAll('.sidebar input[type="range"]').forEach(updateRangeBackground);
     updateBatteryOptions();
     calculate();
 });

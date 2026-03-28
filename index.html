@@ -183,6 +183,7 @@
                     <p class="contact-highlight">For inquiries or technical consultation, please contact our support
                         team.</p>
                 </div>
+                <button class="btn-wizard" id="btnWizard" aria-label="Open quick setup wizard">Quick Setup Wizard</button>
             </div>
 
             <div id="statusAlerts" aria-live="polite" role="status"></div>
@@ -262,6 +263,19 @@
                 </div>
             </section>
 
+            <!-- Savings Projection Chart -->
+            <section class="chart-section" id="chartSection">
+                <h3>15-Year Savings Projection</h3>
+                <div class="chart-container">
+                    <canvas id="savingsChart" aria-label="Chart showing cumulative savings vs system cost over 15 years" role="img"></canvas>
+                </div>
+                <div class="chart-legend">
+                    <span class="legend-item legend-savings">Cumulative Savings</span>
+                    <span class="legend-item legend-cost">System Cost</span>
+                    <span class="legend-item legend-breakeven">Break-even Point</span>
+                </div>
+            </section>
+
             <section class="details-section">
                 <h3>System Configuration Details</h3>
                 <div class="details-grid">
@@ -279,6 +293,32 @@
                         <div id="detConfigContent"></div>
                     </div>
                 </div>
+            </section>
+
+            <!-- System Comparison -->
+            <section class="comparison-section" id="comparisonSection">
+                <h3>System Type Comparison</h3>
+                <p class="section-subtitle">Same inputs applied across all system types for direct comparison.</p>
+                <div class="comparison-table-wrapper">
+                    <table class="comparison-table" id="comparisonTable" role="table" aria-label="Comparison of Grid-Tied, Hybrid, and Off-Grid system types">
+                        <thead>
+                            <tr>
+                                <th scope="col">Metric</th>
+                                <th scope="col" id="compColGridTied">Grid-Tied</th>
+                                <th scope="col" id="compColHybrid">Hybrid</th>
+                                <th scope="col" id="compColOffGrid">Off-Grid</th>
+                            </tr>
+                        </thead>
+                        <tbody id="comparisonBody"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Sensitivity Analysis -->
+            <section class="sensitivity-section" id="sensitivitySection">
+                <h3>Sensitivity Analysis</h3>
+                <p class="section-subtitle">Impact of variable changes on your investment returns.</p>
+                <div class="sensitivity-grid" id="sensitivityGrid"></div>
             </section>
 
             <!-- Get Custom Report CTA -->
@@ -350,6 +390,137 @@
                 <h4>Report Sent Successfully!</h4>
                 <p>Check your email for your custom solar feasibility report. Our team may also reach out to discuss your project.</p>
                 <button class="btn-close-modal" id="btnCloseSuccess">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Setup Wizard Modal -->
+    <div class="modal-overlay wizard-overlay" id="wizardModal" role="dialog" aria-modal="true" aria-labelledby="wizardTitle">
+        <div class="wizard-content">
+            <button class="modal-close wizard-close" id="wizardClose" aria-label="Close wizard">&times;</button>
+            <h3 id="wizardTitle">Quick Setup Wizard</h3>
+
+            <div class="wizard-progress" role="progressbar" aria-valuemin="1" aria-valuemax="6" aria-valuenow="1">
+                <div class="wizard-progress-bar" id="wizardProgressBar"></div>
+                <div class="wizard-steps-indicator">
+                    <span class="wizard-dot active" data-step="1">1</span>
+                    <span class="wizard-dot" data-step="2">2</span>
+                    <span class="wizard-dot" data-step="3">3</span>
+                    <span class="wizard-dot" data-step="4">4</span>
+                    <span class="wizard-dot" data-step="5">5</span>
+                    <span class="wizard-dot" data-step="6">6</span>
+                </div>
+            </div>
+
+            <!-- Step 1: Project Scale -->
+            <div class="wizard-step active" id="wizStep1" role="group" aria-labelledby="wizStep1Title">
+                <h4 id="wizStep1Title">What type of project is this?</h4>
+                <p>Select the scale that best matches your energy needs.</p>
+                <div class="wizard-options">
+                    <button class="wizard-option selected" data-field="projectScale" data-value="Residential">
+                        <strong>Residential</strong>
+                        <small>Up to 20kWp — homes and small buildings</small>
+                    </button>
+                    <button class="wizard-option" data-field="projectScale" data-value="C&I">
+                        <strong>Commercial & Industrial</strong>
+                        <small>21-300kWp — offices, factories, warehouses</small>
+                    </button>
+                    <button class="wizard-option" data-field="projectScale" data-value="Utility Scale">
+                        <strong>Utility Scale</strong>
+                        <small>>300kWp — large-scale solar farms</small>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Step 2: System Type -->
+            <div class="wizard-step" id="wizStep2" role="group" aria-labelledby="wizStep2Title">
+                <h4 id="wizStep2Title">Choose your system type</h4>
+                <p>How do you want your solar system configured?</p>
+                <div class="wizard-options">
+                    <button class="wizard-option selected" data-field="systemType" data-value="Grid-Tied">
+                        <strong>Grid-Tied</strong>
+                        <small>Connected to utility grid, lowest cost, no battery needed</small>
+                    </button>
+                    <button class="wizard-option" data-field="systemType" data-value="Hybrid">
+                        <strong>Hybrid</strong>
+                        <small>Grid + Battery backup for power outages</small>
+                    </button>
+                    <button class="wizard-option" data-field="systemType" data-value="Off-Grid">
+                        <strong>Off-Grid</strong>
+                        <small>Fully independent, requires battery storage</small>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Step 3: Financial -->
+            <div class="wizard-step" id="wizStep3" role="group" aria-labelledby="wizStep3Title">
+                <h4 id="wizStep3Title">Your electricity details</h4>
+                <p>Enter your current electricity bill and rate.</p>
+                <div class="wizard-inputs">
+                    <div class="wizard-input-group">
+                        <label for="wizBill">Monthly Bill (PHP)</label>
+                        <input type="number" id="wizBill" value="15000" step="500" min="0">
+                    </div>
+                    <div class="wizard-input-group">
+                        <label for="wizRate">Rate (PHP/kWh)</label>
+                        <input type="number" id="wizRate" value="13.5" step="0.1" min="1">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 4: Physical -->
+            <div class="wizard-step" id="wizStep4" role="group" aria-labelledby="wizStep4Title">
+                <h4 id="wizStep4Title">Physical constraints</h4>
+                <p>Tell us about your available space and panel preference.</p>
+                <div class="wizard-inputs">
+                    <div class="wizard-input-group">
+                        <label for="wizArea">Available Area (sqm)</label>
+                        <input type="number" id="wizArea" value="50" step="5" min="0">
+                    </div>
+                    <div class="wizard-input-group">
+                        <label for="wizWattage">Panel Wattage (Wp)</label>
+                        <input type="number" id="wizWattage" value="620" step="10" min="100">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 5: Advanced -->
+            <div class="wizard-step" id="wizStep5" role="group" aria-labelledby="wizStep5Title">
+                <h4 id="wizStep5Title">Advanced options</h4>
+                <p>Fine-tune your analysis or keep the defaults.</p>
+                <div class="wizard-inputs">
+                    <div class="wizard-input-group">
+                        <label for="wizSolarTarget">Solar Coverage Target: <span id="wizSolarTargetVal">100</span>%</label>
+                        <input type="range" id="wizSolarTarget" min="0" max="100" value="100">
+                    </div>
+                    <div class="wizard-input-group">
+                        <label for="wizDaytimeLoad">Daytime Load: <span id="wizDaytimeLoadVal">40</span>%</label>
+                        <input type="range" id="wizDaytimeLoad" min="0" max="100" value="40">
+                    </div>
+                    <div class="wizard-input-group hidden" id="wizBatteryGroup">
+                        <label for="wizBackupHours">Backup Hours: <span id="wizBackupHoursVal">4</span>h</label>
+                        <input type="range" id="wizBackupHours" min="1" max="24" value="4">
+                    </div>
+                    <div class="wizard-input-group">
+                        <label class="wizard-checkbox">
+                            <input type="checkbox" id="wizNetMetering">
+                            Enable Net Metering
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 6: Summary -->
+            <div class="wizard-step" id="wizStep6" role="group" aria-labelledby="wizStep6Title">
+                <h4 id="wizStep6Title">Your Configuration Summary</h4>
+                <div class="wizard-summary" id="wizardSummary"></div>
+            </div>
+
+            <!-- Navigation -->
+            <div class="wizard-nav">
+                <button class="wizard-btn wizard-prev" id="wizPrev" disabled>Previous</button>
+                <button class="wizard-btn wizard-next" id="wizNext">Next</button>
+                <button class="wizard-btn wizard-finish hidden" id="wizFinish">View Full Analysis</button>
             </div>
         </div>
     </div>
