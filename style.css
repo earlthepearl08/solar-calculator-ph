@@ -223,6 +223,34 @@ body {
     border: 3px solid var(--bg-secondary);
 }
 
+/* Inline Range Input (tappable number beside slider label) */
+.inline-range-input {
+    width: 3ch;
+    background: transparent;
+    border: none;
+    border-bottom: 1.5px dashed var(--text-muted);
+    color: var(--primary);
+    font-size: inherit;
+    font-weight: 700;
+    font-family: inherit;
+    text-align: center;
+    padding: 0 1px;
+    margin: 0 1px;
+    -moz-appearance: textfield;
+    appearance: textfield;
+    outline: none;
+    transition: border-color 0.2s;
+}
+.inline-range-input::-webkit-outer-spin-button,
+.inline-range-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+.inline-range-input:focus {
+    border-bottom-color: var(--primary);
+    border-bottom-style: solid;
+}
+
 /* Range Labels (min/max) */
 .range-labels {
     display: flex;

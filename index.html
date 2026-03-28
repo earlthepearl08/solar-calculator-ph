@@ -72,7 +72,7 @@
                 </div>
 
                 <div class="input-group" id="solarTargetGroup">
-                    <label for="solarTarget">Target Solar Coverage <span id="solarTargetVal">100</span>%</label>
+                    <label for="solarTarget">Target Solar Coverage <input type="number" id="solarTargetVal" class="inline-range-input" value="100" min="0" max="100" step="1" aria-label="Target solar coverage value">%</label>
                     <input type="range" id="solarTarget" min="0" max="100" value="100" aria-label="Target solar coverage percentage" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100">
                     <div class="range-labels"><span>0%</span><span>100%</span></div>
                     <div class="info-box hidden" id="offGridInfo">Off-Grid systems require 100% target coverage.</div>
@@ -95,7 +95,7 @@
                 </div>
 
                 <div class="input-group" id="daytimeLoadGroup">
-                    <label for="daytimeLoad">Daytime Load Split <span id="daytimeLoadVal">40</span>%</label>
+                    <label for="daytimeLoad">Daytime Load Split <input type="number" id="daytimeLoadVal" class="inline-range-input" value="40" min="0" max="100" step="1" aria-label="Daytime load split value">%</label>
                     <input type="range" id="daytimeLoad" min="0" max="100" value="40" aria-label="Percentage of electricity used during daytime" aria-valuemin="0" aria-valuemax="100" aria-valuenow="40">
                     <div class="range-labels"><span>0%</span><span>100%</span></div>
                     <small class="help-text">Percentage of usage during sun hours (8am-4pm).</small>
@@ -130,7 +130,7 @@
                     <hr>
                     <h3>Battery Configuration</h3>
                     <div class="input-group">
-                        <label for="backupHours">Backup Duration <span id="backupHoursVal">4</span> Hours</label>
+                        <label for="backupHours">Backup Duration <input type="number" id="backupHoursVal" class="inline-range-input" value="4" min="1" max="24" step="1" aria-label="Backup duration value"> Hours</label>
                         <input type="range" id="backupHours" min="1" max="24" value="4" aria-label="Battery backup duration in hours" aria-valuemin="1" aria-valuemax="24" aria-valuenow="4">
                         <div class="range-labels"><span>1h</span><span>24h</span></div>
                     </div>

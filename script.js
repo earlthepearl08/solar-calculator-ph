@@ -423,9 +423,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function getBatteryCostPerKwh(scale) {
-        if (scale === 'Residential') return 20000;
-        if (scale === 'C&I') return 15000;
-        return 12000; // Utility Scale
+        if (scale === 'Residential') return 12500;
+        if (scale === 'C&I') return 12000;
+        return 11500; // Utility Scale
     }
 
     // ==================== BATTERY LOGIC ====================
@@ -590,9 +590,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Update visual labels
         elements.displayProjectScale.textContent = scale + " Project";
-        elements.solarTargetVal.textContent = solarTargetPct;
-        elements.daytimeLoadVal.textContent = daytimeLoadPct;
-        elements.backupHoursVal.textContent = backupHours;
+        elements.solarTargetVal.value = solarTargetPct;
+        elements.daytimeLoadVal.value = daytimeLoadPct;
+        elements.backupHoursVal.value = backupHours;
 
         // Animate metric values
         const prevCapacity = parseFloat(elements.resCapacity.textContent) || 0;
@@ -646,17 +646,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (elements.resPayback) elements.resPayback.textContent = r.paybackYears > 0 ? r.paybackYears.toFixed(1) + " years" : "N/A";
         if (elements.resROI) elements.resROI.textContent = r.roi > 0 ? r.roi.toFixed(0) + "%" : "N/A";
 
-        // Cost breakdown (PV + Battery)
+        // Hide cost breakdown — show lump sum only
         const breakdownEl = document.getElementById('resCostBreakdown');
-        if (breakdownEl) {
-            if (r.batteryCost > 0) {
-                breakdownEl.textContent = 'PV: ' + formatPHPShort(r.solarCost) + ' + Battery: ' + formatPHPShort(r.batteryCost);
-                breakdownEl.classList.remove('hidden');
-            } else {
-                breakdownEl.textContent = '';
-                breakdownEl.classList.add('hidden');
-            }
-        }
+        if (breakdownEl) breakdownEl.classList.add('hidden');
 
         // Store results for report
         window.solarCalcResults = {
@@ -927,12 +919,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (type === 'Off-Grid') {
             elements.offGridInfo.classList.remove('hidden');
             elements.solarTarget.disabled = true;
+            elements.solarTargetVal.disabled = true;
             elements.solarTarget.value = 100;
-            elements.solarTargetVal.textContent = 100;
+            elements.solarTargetVal.value = 100;
             updateRangeBackground(elements.solarTarget);
         } else {
             elements.offGridInfo.classList.add('hidden');
             elements.solarTarget.disabled = false;
+            elements.solarTargetVal.disabled = false;
         }
         if (type === 'Grid-Tied') {
             elements.batterySection.classList.add('hidden');
@@ -975,6 +969,10 @@ document.addEventListener('DOMContentLoaded', () => {
             elements.rate.value = DEFAULTS.rate;
             elements.solarTarget.value = DEFAULTS.solarTarget;
             elements.solarTarget.disabled = false;
+            elements.solarTargetVal.disabled = false;
+            elements.solarTargetVal.value = DEFAULTS.solarTarget;
+            elements.daytimeLoadVal.value = DEFAULTS.daytimeLoad;
+            elements.backupHoursVal.value = DEFAULTS.backupHours;
             elements.area.value = DEFAULTS.area;
             elements.wattage.value = DEFAULTS.wattage;
             elements.daytimeLoad.value = DEFAULTS.daytimeLoad;
@@ -1019,13 +1017,34 @@ document.addEventListener('DOMContentLoaded', () => {
         const handler = (e) => {
             updateRangeBackground(e.target);
             e.target.setAttribute('aria-valuenow', e.target.value);
-            if (e.target === elements.daytimeLoad) { elements.daytimeLoadVal.textContent = e.target.value; }
-            else if (e.target === elements.solarTarget) { elements.solarTargetVal.textContent = e.target.value; }
-            else if (e.target === elements.backupHours) { elements.backupHoursVal.textContent = e.target.value; }
+            if (e.target === elements.daytimeLoad) { elements.daytimeLoadVal.value = e.target.value; }
+            else if (e.target === elements.solarTarget) { elements.solarTargetVal.value = e.target.value; }
+            else if (e.target === elements.backupHours) { elements.backupHoursVal.value = e.target.value; }
         };
         slider.addEventListener('input', handler);
         slider.addEventListener('change', handler);
     });
+
+    // Inline number inputs → sync back to range sliders
+    function syncInlineInput(inputEl, sliderEl) {
+        const commit = () => {
+            let v = parseInt(inputEl.value, 10);
+            const min = parseInt(sliderEl.min, 10);
+            const max = parseInt(sliderEl.max, 10);
+            if (isNaN(v)) v = min;
+            v = Math.max(min, Math.min(max, v));
+            inputEl.value = v;
+            sliderEl.value = v;
+            sliderEl.setAttribute('aria-valuenow', v);
+            updateRangeBackground(sliderEl);
+            calculate();
+        };
+        inputEl.addEventListener('change', commit);
+        inputEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); commit(); inputEl.blur(); } });
+    }
+    syncInlineInput(elements.solarTargetVal, elements.solarTarget);
+    syncInlineInput(elements.daytimeLoadVal, elements.daytimeLoad);
+    syncInlineInput(elements.backupHoursVal, elements.backupHours);
 
     // ==================== MOBILE SIDEBAR TOGGLE ====================
     const mobileToggle = document.getElementById('mobileToggle');
@@ -1310,7 +1329,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <div class="wizard-summary-item">
                     <span class="wizard-summary-label">Est. Cost</span>
-                    <span class="wizard-summary-value">${formatPHPShort(r.estimatedSystemCost)}${r.batteryCost > 0 ? '<br><small style="font-size:0.7em;opacity:0.7">PV: ' + formatPHPShort(r.solarCost) + ' + Battery: ' + formatPHPShort(r.batteryCost) + '</small>' : ''}</span>
+                    <span class="wizard-summary-value">${formatPHPShort(r.estimatedSystemCost)}</span>
                 </div>
                 <div class="wizard-summary-item">
                     <span class="wizard-summary-label">Monthly Savings</span>
@@ -1355,11 +1374,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (wizardState.systemType === 'Off-Grid') {
             elements.offGridInfo.classList.remove('hidden');
             elements.solarTarget.disabled = true;
+            elements.solarTargetVal.disabled = true;
             elements.solarTarget.value = 100;
-            elements.solarTargetVal.textContent = 100;
+            elements.solarTargetVal.value = 100;
         } else {
             elements.offGridInfo.classList.add('hidden');
             elements.solarTarget.disabled = false;
+            elements.solarTargetVal.disabled = false;
         }
 
         if (wizardState.systemType === 'Grid-Tied') {
