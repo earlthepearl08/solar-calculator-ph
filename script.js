@@ -416,12 +416,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ==================== COST CALCULATION ====================
     function getCostPerKwp(scale, capacityKwp) {
-        if (scale === 'Residential') {
-            return 65000;
-        } else if (scale === 'C&I') {
-            return capacityKwp <= 100 ? 60000 : 57000;
-        }
-        return 50000;
+        if (scale === 'Utility Scale') return 42000;
+        if (capacityKwp <= 20) return 58000;
+        if (capacityKwp <= 50) return 53000;
+        if (capacityKwp <= 100) return 48500;
+        if (capacityKwp <= 300) return 45000;
+        return 42000;
     }
 
     function getBatteryCostPerKwh(scale) {
