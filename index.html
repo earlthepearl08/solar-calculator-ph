@@ -486,8 +486,19 @@
                 <p>Tell us about your available space and panel preference.</p>
                 <div class="wizard-inputs">
                     <div class="wizard-input-group">
+                        <label for="wizRoofType">Roof / Site Type</label>
+                        <select id="wizRoofType">
+                            <option value="custom">I know my area</option>
+                            <option value="bungalow">Bungalow (~80 sqm)</option>
+                            <option value="2story">2-Story House (~50 sqm)</option>
+                            <option value="townhouse">Townhouse (~35 sqm)</option>
+                            <option value="condo">Apartment / Condo (~20 sqm)</option>
+                        </select>
+                    </div>
+                    <div class="wizard-input-group">
                         <label for="wizArea">Available Area (sqm)</label>
                         <input type="number" id="wizArea" value="50" step="5" min="0">
+                        <small class="help-text" id="wizRecommendedArea"></small>
                     </div>
                     <div class="wizard-input-group">
                         <label for="wizWattage">Panel Wattage (Wp)</label>

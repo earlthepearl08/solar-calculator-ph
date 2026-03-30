@@ -1261,17 +1261,70 @@ document.addEventListener('DOMContentLoaded', () => {
         // Populate wizard inputs
         const wizBill = document.getElementById('wizBill');
         const wizRate = document.getElementById('wizRate');
+        const wizRoofType = document.getElementById('wizRoofType');
         const wizArea = document.getElementById('wizArea');
+        const wizRecommendedArea = document.getElementById('wizRecommendedArea');
         const wizWattage = document.getElementById('wizWattage');
         const wizSolarTarget = document.getElementById('wizSolarTarget');
         const wizDaytimeLoad = document.getElementById('wizDaytimeLoad');
         const wizBackupHours = document.getElementById('wizBackupHours');
         const wizNetMetering = document.getElementById('wizNetMetering');
 
+        // Update wizard roof type options based on scale
+        if (wizRoofType) {
+            wizRoofType.innerHTML = '<option value="custom">I know my area</option>';
+            const opts = roofTypeAreas[wizardState.projectScale] || roofTypeAreas['Residential'];
+            const labels = {
+                bungalow: 'Bungalow', '2story': '2-Story House', townhouse: 'Townhouse', condo: 'Apartment / Condo',
+                small_commercial: 'Small Office / Shop', medium_commercial: 'Medium Building', warehouse: 'Large Building / Warehouse',
+                small_land: 'Open Land (Small)', large_land: 'Open Land (Large)'
+            };
+            Object.entries(opts).forEach(([key, sqm]) => {
+                const opt = document.createElement('option');
+                opt.value = key;
+                opt.textContent = (labels[key] || key) + ' (~' + sqm + ' sqm)';
+                wizRoofType.appendChild(opt);
+            });
+            wizRoofType.value = elements.roofType.value;
+            wizRoofType.addEventListener('change', () => {
+                if (wizRoofType.value !== 'custom') {
+                    const areaOpts = roofTypeAreas[wizardState.projectScale] || roofTypeAreas['Residential'];
+                    if (areaOpts[wizRoofType.value] && wizArea) {
+                        wizArea.value = areaOpts[wizRoofType.value];
+                    }
+                }
+            });
+        }
+
         if (wizBill) wizBill.value = wizardState.bill;
         if (wizRate) wizRate.value = wizardState.rate;
         if (wizArea) wizArea.value = wizardState.area;
         if (wizWattage) wizWattage.value = wizardState.wattage;
+
+        // Update wizard recommended area hint
+        function updateWizRecommendedArea() {
+            if (!wizRecommendedArea || !wizBill || !wizRate) return;
+            const bill = Math.max(0, parseFloat(wizBill.value) || 0);
+            const rate = Math.max(0.01, parseFloat(wizRate.value) || 1);
+            const target = parseInt(wizSolarTarget ? wizSolarTarget.value : 100) || 100;
+            const watt = Math.max(100, parseFloat(wizWattage ? wizWattage.value : 620) || 620);
+            const type = wizardState.systemType;
+            const dailyKwh = (bill / rate) / DAYS_PER_MONTH;
+            const targetDaily = dailyKwh * (target / 100);
+            const designFactor = type === 'Off-Grid' ? OFFGRID_DESIGN_FACTOR : 1.0;
+            const requiredKwp = (PSH * EFFICIENCY > 0) ? (targetDaily / (PSH * EFFICIENCY)) * designFactor : 0;
+            let panels = Math.ceil((requiredKwp * 1000) / watt) || 0;
+            panels = Math.ceil(panels / PANEL_ROUND_MULTIPLE) * PANEL_ROUND_MULTIPLE;
+            const neededArea = panels * PANEL_SIZE_SQM;
+            if (neededArea > 0) {
+                wizRecommendedArea.textContent = 'Recommended: ~' + neededArea.toFixed(0) + ' sqm for ' + target + '% coverage';
+            }
+        }
+        if (wizBill) wizBill.addEventListener('input', updateWizRecommendedArea);
+        if (wizRate) wizRate.addEventListener('input', updateWizRecommendedArea);
+        if (wizSolarTarget) wizSolarTarget.addEventListener('input', updateWizRecommendedArea);
+        if (wizWattage) wizWattage.addEventListener('input', updateWizRecommendedArea);
+        updateWizRecommendedArea();
         if (wizSolarTarget) wizSolarTarget.value = wizardState.solarTarget;
         if (wizDaytimeLoad) wizDaytimeLoad.value = wizardState.daytimeLoad;
         if (wizBackupHours) wizBackupHours.value = wizardState.backupHours;
@@ -1350,6 +1403,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function readWizardInputs() {
         const wizBill = document.getElementById('wizBill');
         const wizRate = document.getElementById('wizRate');
+        const wizRoofType = document.getElementById('wizRoofType');
         const wizArea = document.getElementById('wizArea');
         const wizWattage = document.getElementById('wizWattage');
         const wizSolarTarget = document.getElementById('wizSolarTarget');
@@ -1359,6 +1413,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (wizBill) wizardState.bill = parseFloat(wizBill.value) || 15000;
         if (wizRate) wizardState.rate = parseFloat(wizRate.value) || 13.5;
+        if (wizRoofType) wizardState.roofType = wizRoofType.value;
         if (wizArea) wizardState.area = parseFloat(wizArea.value) || 50;
         if (wizWattage) wizardState.wattage = parseFloat(wizWattage.value) || 620;
         if (wizSolarTarget) wizardState.solarTarget = parseInt(wizSolarTarget.value) || 100;
@@ -1427,6 +1482,8 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.bill.value = wizardState.bill;
         elements.rate.value = wizardState.rate;
         elements.solarTarget.value = wizardState.solarTarget;
+        updateRoofTypeOptions();
+        if (wizardState.roofType) elements.roofType.value = wizardState.roofType;
         elements.area.value = wizardState.area;
         elements.wattage.value = wizardState.wattage;
         elements.daytimeLoad.value = wizardState.daytimeLoad;
