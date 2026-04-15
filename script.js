@@ -13,7 +13,25 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ==================== CONSTANTS ====================
-    const PSH = 4.0;
+    const REGION_PSH = {
+        metro_manila: 4.3,
+        northern_luzon: 4.3,
+        cordillera: 3.8,
+        central_luzon: 4.4,
+        southern_luzon: 4.5,
+        visayas: 4.8,
+        mindanao: 5.0
+    };
+    const REGION_LABELS = {
+        metro_manila: 'Metro Manila',
+        northern_luzon: 'Northern Luzon',
+        cordillera: 'Baguio / Cordillera',
+        central_luzon: 'Central Luzon',
+        southern_luzon: 'Southern Luzon',
+        visayas: 'Visayas',
+        mindanao: 'Mindanao'
+    };
+    const DEFAULT_PSH = 4.3;
     const EFFICIENCY = 0.80;
     const PANEL_SIZE_SQM = 3.0;
     const SYSTEM_LIFESPAN_YEARS = 25;
@@ -344,6 +362,8 @@ document.addEventListener('DOMContentLoaded', () => {
         systemType: document.getElementById('systemType'),
         bill: document.getElementById('bill'),
         rate: document.getElementById('rate'),
+        region: document.getElementById('region'),
+        breakdownContent: document.getElementById('breakdownContent'),
         solarTarget: document.getElementById('solarTarget'),
         solarTargetVal: document.getElementById('solarTargetVal'),
         roofType: document.getElementById('roofType'),
@@ -483,14 +503,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ==================== PURE COMPUTATION FUNCTION ====================
     function computeSolar(params) {
-        const { scale, type, bill, rate, solarTargetPct, area, wattage, daytimeLoadPct, backupHours, enableNetMetering, genChargeRate } = params;
+        const { scale, type, bill, rate, solarTargetPct, area, wattage, daytimeLoadPct, backupHours, enableNetMetering, genChargeRate, region } = params;
+        const psh = REGION_PSH[region] || DEFAULT_PSH;
 
         const monthlyKwh = rate > 0 ? bill / rate : 0;
         const dailyKwh = monthlyKwh / DAYS_PER_MONTH;
         const targetDailySolarKwh = dailyKwh * (solarTargetPct / 100);
 
         const designFactor = type === 'Off-Grid' ? OFFGRID_DESIGN_FACTOR : 1.0;
-        const requiredKwp = (PSH * EFFICIENCY > 0) ? (targetDailySolarKwh / (PSH * EFFICIENCY)) * designFactor : 0;
+        const requiredKwp = (psh * EFFICIENCY > 0) ? (targetDailySolarKwh / (psh * EFFICIENCY)) * designFactor : 0;
 
         let numPanelsRequired = Math.ceil((requiredKwp * 1000) / wattage) || 0;
         numPanelsRequired = Math.ceil(numPanelsRequired / PANEL_ROUND_MULTIPLE) * PANEL_ROUND_MULTIPLE;
@@ -502,7 +523,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const displayKwp = (displayPanels * wattage) / 1000;
         const displayArea = displayPanels * PANEL_SIZE_SQM;
 
-        const effectiveDailySolarKwh = displayKwp * PSH * EFFICIENCY;
+        const effectiveDailySolarKwh = displayKwp * psh * EFFICIENCY;
         const daytimeLoadKwh = dailyKwh * (daytimeLoadPct / 100);
         const nighttimeLoadKwh = dailyKwh - daytimeLoadKwh;
 
@@ -618,9 +639,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const backupHours = parseInt(elements.backupHours.value);
         const enableNetMetering = elements.enableNetMetering.checked;
         const genChargeRate = Math.max(0, parseFloat(elements.genCharge.value) || 0);
+        const region = elements.region ? elements.region.value : 'metro_manila';
 
         // Build params for pure computation
-        const params = { scale, type, bill, rate, solarTargetPct, area, wattage, daytimeLoadPct, backupHours, enableNetMetering, genChargeRate };
+        const params = { scale, type, bill, rate, solarTargetPct, area, wattage, daytimeLoadPct, backupHours, enableNetMetering, genChargeRate, region };
         const r = computeSolar(params);
 
         // Update visual labels
@@ -684,6 +706,31 @@ document.addEventListener('DOMContentLoaded', () => {
         // Hide cost breakdown — show lump sum only
         const breakdownEl = document.getElementById('resCostBreakdown');
         if (breakdownEl) breakdownEl.classList.add('hidden');
+
+        // 25-year lifetime breakdown
+        if (elements.breakdownContent) {
+            const grossLifetime = r.yearlyCumulative.reduce((sum, pt) => sum + (pt.netAnnual + r.annualOM + (pt.year === INVERTER_REPLACEMENT_YEAR ? r.inverterReplacementCost : 0)), 0);
+            const totalOM = r.annualOM * SYSTEM_LIFESPAN_YEARS;
+            const year1 = r.yearlyCumulative[1] || { netAnnual: 0 };
+            const year25 = r.yearlyCumulative[SYSTEM_LIFESPAN_YEARS] || { netAnnual: 0 };
+            const psh = REGION_PSH[region] || DEFAULT_PSH;
+            elements.breakdownContent.innerHTML = `
+                <div class="breakdown-row"><span>Region (PSH)</span><strong>${REGION_LABELS[region] || region} (${psh})</strong></div>
+                <div class="breakdown-row"><span>Initial system cost</span><strong>${formatPHPShort(r.estimatedSystemCost)}</strong></div>
+                <div class="breakdown-row"><span>Year-1 annual savings</span><strong class="positive">+${formatPHPShort(r.annualSavings)}</strong></div>
+                <div class="breakdown-row"><span>Annual O&amp;M</span><strong class="negative">−${formatPHPShort(r.annualOM)}/yr</strong></div>
+                <div class="breakdown-row"><span>Year-12 inverter replacement</span><strong class="negative">−${formatPHPShort(r.inverterReplacementCost)}</strong></div>
+                <div class="breakdown-divider"></div>
+                <div class="breakdown-row"><span>25-yr gross savings (degraded + inflated)</span><strong class="positive">+${formatPHPShort(grossLifetime)}</strong></div>
+                <div class="breakdown-row"><span>25-yr O&amp;M total</span><strong class="negative">−${formatPHPShort(totalOM)}</strong></div>
+                <div class="breakdown-row"><span>Inverter replacement</span><strong class="negative">−${formatPHPShort(r.inverterReplacementCost)}</strong></div>
+                <div class="breakdown-divider"></div>
+                <div class="breakdown-row"><span>Net 25-yr savings</span><strong class="positive">${formatPHPShort(r.totalLifetimeSavings)}</strong></div>
+                <div class="breakdown-row"><span>Net profit (savings − cost)</span><strong class="positive">${formatPHPShort(r.totalLifetimeSavings - r.estimatedSystemCost)}</strong></div>
+                <div class="breakdown-row"><span>Year-1 net cash flow</span><strong>${formatPHPShort(year1.netAnnual)}</strong></div>
+                <div class="breakdown-row"><span>Year-25 net cash flow</span><strong>${formatPHPShort(year25.netAnnual)}</strong></div>
+            `;
+        }
 
         // Store results for report
         window.solarCalcResults = {
@@ -864,7 +911,8 @@ document.addEventListener('DOMContentLoaded', () => {
             enableNetMetering: elements.enableNetMetering.checked,
             genCharge: elements.genCharge.value,
             currentShift,
-            roofType: elements.roofType.value
+            roofType: elements.roofType.value,
+            region: elements.region ? elements.region.value : 'metro_manila'
         };
         try {
             localStorage.setItem('solarCalcState', JSON.stringify(state));
@@ -881,6 +929,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (state.systemType) elements.systemType.value = state.systemType;
             if (state.bill) elements.bill.value = state.bill;
             if (state.rate) elements.rate.value = state.rate;
+            if (state.region && elements.region) elements.region.value = state.region;
             if (state.solarTarget) elements.solarTarget.value = state.solarTarget;
             if (state.roofType) elements.roofType.value = state.roofType;
             if (state.area) elements.area.value = state.area;
@@ -897,7 +946,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function loadFromURL() {
         const params = new URLSearchParams(window.location.search);
         if (params.size === 0) return false;
-        const map = { scale: 'projectScale', type: 'systemType', bill: 'bill', rate: 'rate', target: 'solarTarget', area: 'area', watt: 'wattage', daytime: 'daytimeLoad', backup: 'backupHours', gencharge: 'genCharge' };
+        const map = { scale: 'projectScale', type: 'systemType', bill: 'bill', rate: 'rate', region: 'region', target: 'solarTarget', area: 'area', watt: 'wattage', daytime: 'daytimeLoad', backup: 'backupHours', gencharge: 'genCharge' };
         let found = false;
         for (const [param, elKey] of Object.entries(map)) {
             const val = params.get(param);
@@ -913,6 +962,7 @@ document.addEventListener('DOMContentLoaded', () => {
         params.set('type', elements.systemType.value);
         params.set('bill', elements.bill.value);
         params.set('rate', elements.rate.value);
+        if (elements.region) params.set('region', elements.region.value);
         params.set('target', elements.solarTarget.value);
         params.set('area', elements.area.value);
         params.set('watt', elements.wattage.value);
@@ -924,7 +974,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ==================== EVENT LISTENERS ====================
-    const immediateElements = [elements.projectScale, elements.systemType, elements.enableNetMetering];
+    const immediateElements = [elements.projectScale, elements.systemType, elements.enableNetMetering, elements.region].filter(Boolean);
     const debouncedElements = [elements.bill, elements.rate, elements.area, elements.wattage, elements.genCharge];
     const rangeElements = [elements.solarTarget, elements.daytimeLoad, elements.backupHours];
 
@@ -1028,10 +1078,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const solarTargetPct = parseInt(elements.solarTarget.value) || 100;
         const wattage = Math.max(100, parseFloat(elements.wattage.value) || 620);
         const type = elements.systemType.value;
+        const psh = REGION_PSH[elements.region.value] || DEFAULT_PSH;
         const dailyKwh = (bill / rate) / DAYS_PER_MONTH;
         const targetDaily = dailyKwh * (solarTargetPct / 100);
         const designFactor = type === 'Off-Grid' ? OFFGRID_DESIGN_FACTOR : 1.0;
-        const requiredKwp = (PSH * EFFICIENCY > 0) ? (targetDaily / (PSH * EFFICIENCY)) * designFactor : 0;
+        const requiredKwp = (psh * EFFICIENCY > 0) ? (targetDaily / (psh * EFFICIENCY)) * designFactor : 0;
         let panels = Math.ceil((requiredKwp * 1000) / wattage) || 0;
         panels = Math.ceil(panels / PANEL_ROUND_MULTIPLE) * PANEL_ROUND_MULTIPLE;
         const neededArea = panels * PANEL_SIZE_SQM;
@@ -1069,6 +1120,7 @@ document.addEventListener('DOMContentLoaded', () => {
             elements.systemType.value = DEFAULTS.systemType;
             elements.bill.value = DEFAULTS.bill;
             elements.rate.value = DEFAULTS.rate;
+            if (elements.region) elements.region.value = 'metro_manila';
             elements.solarTarget.value = DEFAULTS.solarTarget;
             elements.solarTarget.disabled = false;
             elements.solarTargetVal.disabled = false;
@@ -1274,7 +1326,8 @@ document.addEventListener('DOMContentLoaded', () => {
         bill: 15000, rate: 13.5,
         area: 50, wattage: 620,
         solarTarget: 100, daytimeLoad: 75,
-        backupHours: 4, enableNetMetering: false
+        backupHours: 4, enableNetMetering: false,
+        region: 'metro_manila'
     };
 
     function openWizard() {
@@ -1284,6 +1337,7 @@ document.addEventListener('DOMContentLoaded', () => {
         wizardState.systemType = elements.systemType.value;
         wizardState.bill = parseFloat(elements.bill.value) || 15000;
         wizardState.rate = parseFloat(elements.rate.value) || 13.5;
+        wizardState.region = (elements.region && elements.region.value) || 'metro_manila';
         wizardState.area = parseFloat(elements.area.value) || 50;
         wizardState.wattage = parseFloat(elements.wattage.value) || 620;
         wizardState.solarTarget = parseInt(elements.solarTarget.value) || 100;
@@ -1294,6 +1348,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Populate wizard inputs
         const wizBill = document.getElementById('wizBill');
         const wizRate = document.getElementById('wizRate');
+        const wizRegion = document.getElementById('wizRegion');
         const wizRoofType = document.getElementById('wizRoofType');
         const wizArea = document.getElementById('wizArea');
         const wizRecommendedArea = document.getElementById('wizRecommendedArea');
@@ -1331,6 +1386,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (wizBill) wizBill.value = wizardState.bill;
         if (wizRate) wizRate.value = wizardState.rate;
+        if (wizRegion) wizRegion.value = wizardState.region || (elements.region ? elements.region.value : 'metro_manila');
         if (wizArea) wizArea.value = wizardState.area;
         if (wizWattage) wizWattage.value = wizardState.wattage;
 
@@ -1342,10 +1398,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const target = parseInt(wizSolarTarget ? wizSolarTarget.value : 100) || 100;
             const watt = Math.max(100, parseFloat(wizWattage ? wizWattage.value : 620) || 620);
             const type = wizardState.systemType;
+            const psh = REGION_PSH[wizardState.region] || DEFAULT_PSH;
             const dailyKwh = (bill / rate) / DAYS_PER_MONTH;
             const targetDaily = dailyKwh * (target / 100);
             const designFactor = type === 'Off-Grid' ? OFFGRID_DESIGN_FACTOR : 1.0;
-            const requiredKwp = (PSH * EFFICIENCY > 0) ? (targetDaily / (PSH * EFFICIENCY)) * designFactor : 0;
+            const requiredKwp = (psh * EFFICIENCY > 0) ? (targetDaily / (psh * EFFICIENCY)) * designFactor : 0;
             let panels = Math.ceil((requiredKwp * 1000) / watt) || 0;
             panels = Math.ceil(panels / PANEL_ROUND_MULTIPLE) * PANEL_ROUND_MULTIPLE;
             const neededArea = panels * PANEL_SIZE_SQM;
@@ -1443,9 +1500,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const wizDaytimeLoad = document.getElementById('wizDaytimeLoad');
         const wizBackupHours = document.getElementById('wizBackupHours');
         const wizNetMetering = document.getElementById('wizNetMetering');
+        const wizRegion = document.getElementById('wizRegion');
 
         if (wizBill) wizardState.bill = parseFloat(wizBill.value) || 15000;
         if (wizRate) wizardState.rate = parseFloat(wizRate.value) || 13.5;
+        if (wizRegion) wizardState.region = wizRegion.value;
         if (wizRoofType) wizardState.roofType = wizRoofType.value;
         if (wizArea) wizardState.area = parseFloat(wizArea.value) || 50;
         if (wizWattage) wizardState.wattage = parseFloat(wizWattage.value) || 620;
@@ -1471,7 +1530,8 @@ document.addEventListener('DOMContentLoaded', () => {
             daytimeLoadPct: wizardState.daytimeLoad,
             backupHours: wizardState.backupHours,
             enableNetMetering: wizardState.enableNetMetering,
-            genChargeRate: parseFloat(elements.genCharge.value) || 5.5
+            genChargeRate: parseFloat(elements.genCharge.value) || 5.5,
+            region: wizardState.region || 'metro_manila'
         };
 
         const r = computeSolar(params);
@@ -1514,6 +1574,7 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.systemType.value = wizardState.systemType;
         elements.bill.value = wizardState.bill;
         elements.rate.value = wizardState.rate;
+        if (elements.region && wizardState.region) elements.region.value = wizardState.region;
         elements.solarTarget.value = wizardState.solarTarget;
         updateRoofTypeOptions();
         if (wizardState.roofType) elements.roofType.value = wizardState.roofType;

@@ -71,6 +71,22 @@
                     </div>
                 </div>
 
+                <div class="input-group">
+                    <label for="region">
+                        Region
+                        <span class="tooltip-icon" tabindex="0" role="button" aria-label="Affects peak sun hours used in solar generation calculations" data-tooltip="Affects peak sun hours (PSH) used in solar generation calculations">ⓘ</span>
+                    </label>
+                    <select id="region" aria-label="Project region for solar irradiance">
+                        <option value="metro_manila">Metro Manila (PSH 4.3)</option>
+                        <option value="northern_luzon">Northern Luzon (PSH 4.3)</option>
+                        <option value="cordillera">Baguio / Cordillera (PSH 3.8)</option>
+                        <option value="central_luzon">Central Luzon (PSH 4.4)</option>
+                        <option value="southern_luzon">Southern Luzon (PSH 4.5)</option>
+                        <option value="visayas">Visayas (PSH 4.8)</option>
+                        <option value="mindanao">Mindanao (PSH 5.0)</option>
+                    </select>
+                </div>
+
                 <div class="input-group" id="solarTargetGroup">
                     <label for="solarTarget">Target Solar Coverage <input type="number" id="solarTargetVal" class="inline-range-input" value="100" min="0" max="100" step="1" aria-label="Target solar coverage value">%</label>
                     <input type="range" id="solarTarget" min="0" max="100" value="100" aria-label="Target solar coverage percentage" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100">
@@ -237,6 +253,10 @@
                         <span class="metric-value" id="resROI">0%</span>
                     </div>
                 </div>
+                <details class="lifetime-breakdown" id="lifetimeBreakdown">
+                    <summary>See 25-year cost & savings breakdown</summary>
+                    <div class="breakdown-grid" id="breakdownContent"></div>
+                </details>
                 <p class="roi-disclaimer">* Lifetime model assumes 0.5%/yr panel degradation, 3.5%/yr electricity rate inflation, annual O&amp;M (0.8–1.2% of system cost), and one inverter replacement at Year 12 (~12% of solar cost). Actual results vary with site conditions, usage patterns, and economic changes. Contact us for a detailed quotation.</p>
             </section>
 
@@ -476,6 +496,18 @@
                     <div class="wizard-input-group">
                         <label for="wizRate">Rate (PHP/kWh)</label>
                         <input type="number" id="wizRate" value="13.5" step="0.1" min="1">
+                    </div>
+                    <div class="wizard-input-group">
+                        <label for="wizRegion">Region</label>
+                        <select id="wizRegion">
+                            <option value="metro_manila">Metro Manila</option>
+                            <option value="northern_luzon">Northern Luzon</option>
+                            <option value="cordillera">Baguio / Cordillera</option>
+                            <option value="central_luzon">Central Luzon</option>
+                            <option value="southern_luzon">Southern Luzon</option>
+                            <option value="visayas">Visayas</option>
+                            <option value="mindanao">Mindanao</option>
+                        </select>
                     </div>
                 </div>
             </div>

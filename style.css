@@ -1352,6 +1352,51 @@ body {
     border-left: 3px solid var(--accent);
 }
 
+/* 25-year lifetime breakdown */
+.lifetime-breakdown {
+    margin-top: 1rem;
+    background: var(--bg-card);
+    border-radius: var(--radius-md);
+    padding: 0.75rem 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+.lifetime-breakdown summary {
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-secondary, var(--text-muted));
+    list-style: none;
+    user-select: none;
+}
+.lifetime-breakdown summary::-webkit-details-marker { display: none; }
+.lifetime-breakdown summary::before {
+    content: '▸ ';
+    transition: transform 0.2s;
+    display: inline-block;
+}
+.lifetime-breakdown[open] summary::before { content: '▾ '; }
+.breakdown-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.4rem;
+    margin-top: 0.75rem;
+    font-size: 0.8rem;
+}
+.breakdown-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 0.25rem 0;
+}
+.breakdown-row span { color: var(--text-muted); }
+.breakdown-row strong { color: var(--text-primary, #fff); font-weight: 700; }
+.breakdown-row strong.positive { color: var(--success, #10b981); }
+.breakdown-row strong.negative { color: var(--danger, #ef4444); }
+.breakdown-divider {
+    border-top: 1px dashed rgba(255, 255, 255, 0.1);
+    margin: 0.3rem 0;
+}
+
 /* ==================== REPORT CTA SECTION ==================== */
 .report-cta-section {
     margin: 2.5rem 0;
