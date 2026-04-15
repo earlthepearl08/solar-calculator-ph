@@ -41,10 +41,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const PANEL_ROUND_MULTIPLE = 2;
     const DEBOUNCE_MS = 150;
     // Financial realism constants
-    const PANEL_DEGRADATION_RATE = 0.005; // 0.5%/yr linear (Tier 1 monocrystalline)
-    const ELECTRICITY_RATE_INFLATION = 0.035; // 3.5%/yr conservative PH average
+    const PANEL_DEGRADATION_RATE = 0.004; // 0.4%/yr (premium Tier 1: Canadian Solar, Trina, Jinko)
+    const ELECTRICITY_RATE_INFLATION = 0.045; // 4.5%/yr (Meralco historical CAGR)
     const INVERTER_REPLACEMENT_YEAR = 12;
-    const INVERTER_REPLACEMENT_COST_PCT = 0.12; // 12% of solar cost
+    const INVERTER_REPLACEMENT_COST_PCT = 0.10; // 10% of solar cost
 
     // ==================== UTILITIES ====================
     function debounce(fn, ms) {
@@ -458,9 +458,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function getOMRatePerYear(scale) {
         // Annual operations & maintenance as fraction of system cost
-        if (scale === 'Residential') return 0.008; // 0.8%/yr (cleaning, monitoring)
-        if (scale === 'C&I') return 0.010; // 1.0%/yr
-        return 0.012; // Utility Scale 1.2%/yr
+        // Residential assumes owner-maintained (occasional cleaning only)
+        if (scale === 'Residential') return 0.003; // 0.3%/yr
+        if (scale === 'C&I') return 0.006; // 0.6%/yr (professional cleaning contract)
+        return 0.009; // Utility Scale 0.9%/yr
     }
 
     // ==================== BATTERY LOGIC ====================
