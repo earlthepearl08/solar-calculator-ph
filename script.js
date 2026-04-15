@@ -416,18 +416,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ==================== COST CALCULATION ====================
     function getCostPerKwp(scale, capacityKwp) {
-        if (scale === 'Utility Scale') return 42000;
-        if (capacityKwp <= 20) return 58000;
-        if (capacityKwp <= 50) return 53000;
-        if (capacityKwp <= 100) return 48500;
-        if (capacityKwp <= 300) return 45000;
-        return 42000;
+        if (scale === 'Utility Scale') return 44000;
+        if (capacityKwp <= 20) return 60000;
+        if (capacityKwp <= 50) return 55000;
+        if (capacityKwp <= 100) return 50500;
+        if (capacityKwp <= 300) return 47000;
+        return 44000;
     }
 
     function getBatteryCostPerKwh(scale) {
-        if (scale === 'Residential') return 12500;
-        if (scale === 'C&I') return 12000;
-        return 11500; // Utility Scale
+        // ~₱165k per 314Ah (15kWh) battery with labor = ₱11,000/kWh
+        if (scale === 'Residential') return 11000;
+        if (scale === 'C&I') return 10500;
+        return 10000; // Utility Scale
     }
 
     // ==================== BATTERY LOGIC ====================
