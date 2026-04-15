@@ -16,12 +16,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const PSH = 4.0;
     const EFFICIENCY = 0.80;
     const PANEL_SIZE_SQM = 3.0;
-    const SYSTEM_LIFESPAN_YEARS = 15;
+    const SYSTEM_LIFESPAN_YEARS = 25;
     const DAYS_PER_MONTH = 30;
     const OFFGRID_DESIGN_FACTOR = 1.25;
     const BATTERY_DOD = 0.9;
     const PANEL_ROUND_MULTIPLE = 2;
     const DEBOUNCE_MS = 150;
+    // Financial realism constants
+    const PANEL_DEGRADATION_RATE = 0.005; // 0.5%/yr linear (Tier 1 monocrystalline)
+    const ELECTRICITY_RATE_INFLATION = 0.035; // 3.5%/yr conservative PH average
+    const INVERTER_REPLACEMENT_YEAR = 12;
+    const INVERTER_REPLACEMENT_COST_PCT = 0.12; // 12% of solar cost
 
     // ==================== UTILITIES ====================
     function debounce(fn, ms) {
@@ -126,14 +131,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         update(results) {
-            const years = [];
-            for (let y = 0; y <= SYSTEM_LIFESPAN_YEARS; y++) {
-                years.push({
-                    year: y,
-                    cumulativeSavings: results.annualSavings * y,
-                    systemCost: results.estimatedSystemCost
-                });
-            }
+            const source = Array.isArray(results.yearlyCumulative) && results.yearlyCumulative.length
+                ? results.yearlyCumulative
+                : Array.from({ length: SYSTEM_LIFESPAN_YEARS + 1 }, (_, y) => ({ year: y, cumulative: (results.annualSavings || 0) * y }));
+            const years = source.map(pt => ({
+                year: pt.year,
+                cumulativeSavings: pt.cumulative,
+                systemCost: results.estimatedSystemCost
+            }));
             this.data = {
                 years,
                 paybackYear: results.paybackYears,
@@ -219,7 +224,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // X-axis labels
             ctx.textAlign = 'center';
             ctx.font = '600 10px Inter, sans-serif';
-            for (let yr = 0; yr <= xMax; yr += 3) {
+            for (let yr = 0; yr <= xMax; yr += 5) {
                 const x = toX(yr);
                 ctx.fillStyle = colorMuted;
                 ctx.fillText('Yr ' + yr, x, h - pad.bottom + 20);
@@ -431,6 +436,13 @@ document.addEventListener('DOMContentLoaded', () => {
         return 10000; // Utility Scale
     }
 
+    function getOMRatePerYear(scale) {
+        // Annual operations & maintenance as fraction of system cost
+        if (scale === 'Residential') return 0.008; // 0.8%/yr (cleaning, monitoring)
+        if (scale === 'C&I') return 0.010; // 1.0%/yr
+        return 0.012; // Utility Scale 1.2%/yr
+    }
+
     // ==================== BATTERY LOGIC ====================
     function findOptimalBattery(requiredKwh, scale) {
         const options = batteryOptionsMap[scale];
@@ -547,8 +559,27 @@ document.addEventListener('DOMContentLoaded', () => {
             ? batteryCapacityTotal * getBatteryCostPerKwh(scale) : 0;
         const estimatedSystemCost = solarCost + batteryCost;
         const annualSavings = c1MonthlySavings * 12;
-        const paybackYears = annualSavings > 0 ? estimatedSystemCost / annualSavings : 0;
-        const totalLifetimeSavings = annualSavings * SYSTEM_LIFESPAN_YEARS;
+
+        // Realistic lifetime model: panel degradation, rate inflation, O&M, inverter replacement
+        const annualOM = estimatedSystemCost * getOMRatePerYear(scale);
+        const inverterReplacementCost = solarCost * INVERTER_REPLACEMENT_COST_PCT;
+        const yearlyCumulative = [{ year: 0, netAnnual: 0, cumulative: 0 }];
+        let cumulativeNet = 0;
+        let paybackYears = 0;
+        for (let year = 1; year <= SYSTEM_LIFESPAN_YEARS; year++) {
+            const degradationFactor = Math.pow(1 - PANEL_DEGRADATION_RATE, year - 1);
+            const inflationFactor = Math.pow(1 + ELECTRICITY_RATE_INFLATION, year - 1);
+            const grossSavings = annualSavings * degradationFactor * inflationFactor;
+            let netAnnual = grossSavings - annualOM;
+            if (year === INVERTER_REPLACEMENT_YEAR) netAnnual -= inverterReplacementCost;
+            const prevCumulative = cumulativeNet;
+            cumulativeNet += netAnnual;
+            if (paybackYears === 0 && prevCumulative < estimatedSystemCost && cumulativeNet >= estimatedSystemCost && netAnnual > 0) {
+                paybackYears = (year - 1) + (estimatedSystemCost - prevCumulative) / netAnnual;
+            }
+            yearlyCumulative.push({ year, netAnnual, cumulative: cumulativeNet });
+        }
+        const totalLifetimeSavings = cumulativeNet;
         const roi = estimatedSystemCost > 0 ? ((totalLifetimeSavings - estimatedSystemCost) / estimatedSystemCost * 100) : 0;
 
         const isSpaceLimited = numPanelsRequired > cappedPanelsPossible;
@@ -561,6 +592,7 @@ document.addEventListener('DOMContentLoaded', () => {
             c1Title, c1Desc, c1DailySavingsKwh, c1MonthlySavings, c1Offset, residualSurplusKwh,
             c2MonthlySavings, c2Offset,
             solarCost, batteryCost, estimatedSystemCost, costPerKwp, paybackYears, roi, annualSavings, totalLifetimeSavings,
+            yearlyCumulative, annualOM, inverterReplacementCost,
             batteryConfig, isSpaceLimited, numPanelsRequired, cappedPanelsPossible
         };
     }
@@ -720,7 +752,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Update Phase 6 features
-        if (savingsChart) savingsChart.update({ annualSavings: r.annualSavings, estimatedSystemCost: r.estimatedSystemCost, paybackYears: r.paybackYears });
+        if (savingsChart) savingsChart.update({ yearlyCumulative: r.yearlyCumulative, estimatedSystemCost: r.estimatedSystemCost, paybackYears: r.paybackYears, annualSavings: r.annualSavings });
         updateComparisonTable(params);
         updateSensitivityAnalysis(params);
         updateRecommendedArea();
@@ -751,7 +783,7 @@ document.addEventListener('DOMContentLoaded', () => {
             { label: 'Est. System Cost', fn: r => formatPHPShort(r.estimatedSystemCost) },
             { label: 'Monthly Savings', fn: r => formatPHP(r.c1MonthlySavings) },
             { label: 'Payback Period', fn: r => r.paybackYears > 0 ? r.paybackYears.toFixed(1) + ' years' : 'N/A' },
-            { label: '15-Year ROI', fn: r => r.roi > 0 ? r.roi.toFixed(0) + '%' : 'N/A' },
+            { label: '25-Year ROI', fn: r => r.roi > 0 ? r.roi.toFixed(0) + '%' : 'N/A' },
             { label: 'Battery Config', fn: r => r.batteryConfig }
         ];
 
@@ -1467,7 +1499,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <span class="wizard-summary-value">${r.paybackYears > 0 ? r.paybackYears.toFixed(1) + ' years' : 'N/A'}</span>
                 </div>
                 <div class="wizard-summary-item">
-                    <span class="wizard-summary-label">15-Year ROI</span>
+                    <span class="wizard-summary-label">25-Year ROI</span>
                     <span class="wizard-summary-value highlight-success">${r.roi > 0 ? r.roi.toFixed(0) + '%' : 'N/A'}</span>
                 </div>
             </div>
