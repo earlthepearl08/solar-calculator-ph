@@ -451,10 +451,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function getBatteryCostPerKwh(scale) {
-        // ~₱160k per 314Ah (16kWh) battery with labor = ₱10,000/kWh
-        if (scale === 'Residential') return 10000;
-        if (scale === 'C&I') return 9500;
-        return 9000; // Utility Scale
+        // Flat ₱11,000/kWh across all scales (simplified pricing)
+        return 11000;
     }
 
     function getOMRatePerYear(scale) {
