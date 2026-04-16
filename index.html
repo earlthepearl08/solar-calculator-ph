@@ -18,8 +18,9 @@
     <div class="sidebar-overlay" id="sidebarOverlay"></div>
     <div class="app-container">
         <!-- Mobile Toggle Button -->
-        <button class="mobile-toggle" id="mobileToggle" aria-label="Toggle sidebar">
-            ⚙️
+        <button class="mobile-toggle" id="mobileToggle" aria-label="Open system inputs">
+            <span class="mobile-toggle-icon" aria-hidden="true">☰</span>
+            <span class="mobile-toggle-label">Inputs</span>
         </button>
         <!-- Sidebar -->
         <aside class="sidebar" role="complementary" aria-label="System configuration inputs">
@@ -113,14 +114,6 @@
                     <small class="help-text" id="recommendedArea"></small>
                 </div>
 
-                <div class="input-group">
-                    <label for="wattage">
-                        PV Module Wattage (Wp)
-                        <span class="tooltip-icon" tabindex="0" role="button" aria-label="Power rating of each solar panel. Modern panels typically range from 400-700W" data-tooltip="Power rating of each solar panel. Modern panels typically range from 400-700W">ⓘ</span>
-                    </label>
-                    <input type="number" id="wattage" value="620" step="10" min="100" aria-label="Solar panel wattage in watts peak">
-                </div>
-
                 <div class="input-group" id="daytimeLoadGroup">
                     <label for="daytimeLoad">Daytime Load Split <input type="number" id="daytimeLoadVal" class="inline-range-input" value="75" min="0" max="100" step="1" aria-label="Daytime load split value">%</label>
                     <input type="range" id="daytimeLoad" min="0" max="100" value="75" aria-label="Percentage of electricity used during daytime" aria-valuemin="0" aria-valuemax="100" aria-valuenow="75">
@@ -147,11 +140,6 @@
                     <small class="help-text">1 shift typically starts at 6am. Percentages account for peak sun hours (8am-4pm) plus extended generation during late afternoon that continues post-shift.</small>
                 </div>
 
-                <div class="info-panel panel-size">
-                    <p>Panel Size: <strong>3.0 sqm</strong></p>
-                    <small>(Includes spacing and constraints)</small>
-                </div>
-
                 <!-- Battery Section -->
                 <div id="batterySection" class="hidden">
                     <hr>
@@ -169,19 +157,31 @@
                 </div>
 
                 <!-- Advanced Features -->
-                <div id="advancedSection">
-                    <hr>
-                    <h3>Advanced Features</h3>
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="enableNetMetering" aria-label="Enable net metering to sell surplus power back to the grid">
-                        <label for="enableNetMetering">Enable Net Metering</label>
+                <details id="advancedSection" class="advanced-section">
+                    <summary>Advanced Options</summary>
+                    <div class="advanced-content">
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="enableNetMetering" aria-label="Enable net metering to sell surplus power back to the grid">
+                            <label for="enableNetMetering">Enable Net Metering</label>
+                        </div>
+                        <div class="input-group hidden" id="genChargeGroup">
+                            <label for="genCharge">Avg. Generation Charge (PHP/kWh)</label>
+                            <input type="number" id="genCharge" value="5.5" step="0.1" min="0" aria-label="Average generation charge rate">
+                            <small class="help-text">Rate utility buys your excess power.</small>
+                        </div>
+                        <div class="input-group">
+                            <label for="wattage">
+                                PV Module Wattage (Wp)
+                                <span class="tooltip-icon" tabindex="0" role="button" aria-label="Power rating of each solar panel. Modern panels typically range from 400-700W" data-tooltip="Power rating of each solar panel. Modern panels typically range from 400-700W">ⓘ</span>
+                            </label>
+                            <input type="number" id="wattage" value="620" step="10" min="100" aria-label="Solar panel wattage in watts peak">
+                        </div>
+                        <div class="info-panel panel-size">
+                            <p>Panel Size: <strong>3.0 sqm</strong></p>
+                            <small>Includes spacing and mounting constraints.</small>
+                        </div>
                     </div>
-                    <div class="input-group hidden" id="genChargeGroup">
-                        <label for="genCharge">Avg. Generation Charge (PHP/kWh)</label>
-                        <input type="number" id="genCharge" value="5.5" step="0.1" min="0" aria-label="Average generation charge rate">
-                        <small class="help-text">Rate utility buys your excess power.</small>
-                    </div>
-                </div>
+                </details>
 
                 <!-- Action Buttons -->
                 <div class="sidebar-actions">
@@ -199,43 +199,13 @@
             </header>
 
             <div class="intro-box">
-                <p>This tool provides a rapid assessment of your solar energy potential, calculating required capacity
-                    and estimated bill offsets based on your available space and monthly consumption.</p>
-
-                <div class="alert-box warning">
-                    <p><strong>* Rough Estimate Only:</strong> Projections based on standard conditions. Actual
-                        performance depends on shading, orientation, and weather.</p>
-                    <p><strong>Note on Costs:</strong> Expected savings only. Request a formal quotation for hardware,
-                        labor, and ROI analysis.</p>
-                    <p class="contact-highlight">For inquiries or technical consultation, please contact our support
-                        team.</p>
-                </div>
-                <button class="btn-wizard" id="btnWizard" aria-label="Open quick setup wizard">Quick Setup Wizard</button>
+                <p class="intro-lead">See your 25-year solar savings in seconds.</p>
+                <button class="btn-wizard" id="btnWizard" aria-label="Open quick setup wizard">🧙 Quick Setup Wizard</button>
             </div>
 
             <div id="statusAlerts" aria-live="polite" role="status"></div>
 
-            <!-- Primary Metrics -->
-            <div class="metrics-grid">
-                <div class="metric-card">
-                    <span class="metric-label">System Capacity</span>
-                    <span class="metric-value" id="resCapacity">0.00 kWp</span>
-                </div>
-                <div class="metric-card">
-                    <span class="metric-label">Number of Panels</span>
-                    <span class="metric-value" id="resPanels">0</span>
-                </div>
-                <div class="metric-card">
-                    <span class="metric-label">Total Area Used</span>
-                    <span class="metric-value" id="resArea">0.0 m²</span>
-                </div>
-                <div class="metric-card hidden" id="resStorageCard">
-                    <span class="metric-label">Total Storage</span>
-                    <span class="metric-value" id="resStorage">0.0 kWh</span>
-                </div>
-            </div>
-
-            <!-- Investment Analysis -->
+            <!-- Investment Analysis (lead with the money) -->
             <section class="roi-section">
                 <h3>Investment Analysis</h3>
                 <div class="metrics-grid roi-grid">
@@ -254,14 +224,32 @@
                     </div>
                 </div>
                 <details class="lifetime-breakdown" id="lifetimeBreakdown">
-                    <summary>See 25-year cost & savings breakdown</summary>
+                    <summary>
+                        <span class="breakdown-summary-label">25-year net profit:</span>
+                        <strong class="breakdown-summary-value" id="breakdownHeadline">—</strong>
+                        <span class="breakdown-summary-hint">see full breakdown</span>
+                    </summary>
                     <div class="breakdown-grid" id="breakdownContent"></div>
                 </details>
-                <p class="roi-disclaimer">* Lifetime model assumes 0.4%/yr panel degradation (premium Tier 1), 4.5%/yr electricity rate inflation (Meralco historical CAGR), annual O&amp;M (0.3–0.9% of system cost depending on scale), and one inverter replacement at Year 12 (~10% of solar cost). Actual results vary with site conditions, usage patterns, and economic changes. Contact us for a detailed quotation.</p>
+                <p class="roi-disclaimer">* Lifetime model assumes 0.4%/yr panel degradation (premium Tier 1), 4.5%/yr electricity rate inflation (Meralco historical CAGR), annual O&amp;M (0.3–0.9% of system cost depending on scale), and one inverter replacement at Year 12 (~10% of solar cost). Rough estimate only — request a formal quotation for final ROI and hardware scope.</p>
             </section>
 
+            <!-- Savings Projection Chart (visual breakeven right after headline number) -->
+            <section class="chart-section" id="chartSection">
+                <h3>25-Year Savings Projection</h3>
+                <div class="chart-container">
+                    <canvas id="savingsChart" aria-label="Chart showing cumulative savings vs system cost over 25 years" role="img"></canvas>
+                </div>
+                <div class="chart-legend">
+                    <span class="legend-item legend-savings">Cumulative Savings</span>
+                    <span class="legend-item legend-cost">System Cost</span>
+                    <span class="legend-item legend-breakeven">Break-even Point</span>
+                </div>
+            </section>
+
+            <!-- Savings Scenarios -->
             <section class="analysis-section">
-                <h3>Savings and Offset Analysis</h3>
+                <h3>Monthly Savings Breakdown</h3>
                 <div class="results-grid">
                     <div class="result-card primary" id="cardScenario1">
                         <h4 id="sc1Title">1. Grid-Tied (Direct)</h4>
@@ -295,16 +283,26 @@
                 </div>
             </section>
 
-            <!-- Savings Projection Chart -->
-            <section class="chart-section" id="chartSection">
-                <h3>25-Year Savings Projection</h3>
-                <div class="chart-container">
-                    <canvas id="savingsChart" aria-label="Chart showing cumulative savings vs system cost over 15 years" role="img"></canvas>
-                </div>
-                <div class="chart-legend">
-                    <span class="legend-item legend-savings">Cumulative Savings</span>
-                    <span class="legend-item legend-cost">System Cost</span>
-                    <span class="legend-item legend-breakeven">Break-even Point</span>
+            <!-- Tech Specs (moved below; this is "confirming the estimate") -->
+            <section class="specs-section">
+                <h3>System Specifications</h3>
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <span class="metric-label">System Capacity</span>
+                        <span class="metric-value" id="resCapacity">0.00 kWp</span>
+                    </div>
+                    <div class="metric-card">
+                        <span class="metric-label">Number of Panels</span>
+                        <span class="metric-value" id="resPanels">0</span>
+                    </div>
+                    <div class="metric-card">
+                        <span class="metric-label">Total Area Used</span>
+                        <span class="metric-value" id="resArea">0.0 m²</span>
+                    </div>
+                    <div class="metric-card hidden" id="resStorageCard">
+                        <span class="metric-label">Total Storage</span>
+                        <span class="metric-value" id="resStorage">0.0 kWh</span>
+                    </div>
                 </div>
             </section>
 
@@ -327,31 +325,33 @@
                 </div>
             </section>
 
-            <!-- System Comparison -->
-            <section class="comparison-section" id="comparisonSection">
-                <h3>System Type Comparison</h3>
-                <p class="section-subtitle">Same inputs applied across all system types for direct comparison.</p>
-                <div class="comparison-table-wrapper">
-                    <table class="comparison-table" id="comparisonTable" role="table" aria-label="Comparison of Grid-Tied, Hybrid, and Off-Grid system types">
-                        <thead>
-                            <tr>
-                                <th scope="col">Metric</th>
-                                <th scope="col" id="compColGridTied">Grid-Tied</th>
-                                <th scope="col" id="compColHybrid">Hybrid</th>
-                                <th scope="col" id="compColOffGrid">Off-Grid</th>
-                            </tr>
-                        </thead>
-                        <tbody id="comparisonBody"></tbody>
-                    </table>
-                </div>
-            </section>
+            <!-- Power-user: Comparison + Sensitivity combined into one collapsible -->
+            <details class="advanced-analysis" id="advancedAnalysis">
+                <summary>📊 Compare scenarios & what-if analysis</summary>
+                <section class="comparison-section" id="comparisonSection">
+                    <h3>System Type Comparison</h3>
+                    <p class="section-subtitle">Same inputs applied across all system types for direct comparison.</p>
+                    <div class="comparison-table-wrapper">
+                        <table class="comparison-table" id="comparisonTable" role="table" aria-label="Comparison of Grid-Tied, Hybrid, and Off-Grid system types">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Metric</th>
+                                    <th scope="col" id="compColGridTied">Grid-Tied</th>
+                                    <th scope="col" id="compColHybrid">Hybrid</th>
+                                    <th scope="col" id="compColOffGrid">Off-Grid</th>
+                                </tr>
+                            </thead>
+                            <tbody id="comparisonBody"></tbody>
+                        </table>
+                    </div>
+                </section>
 
-            <!-- Sensitivity Analysis -->
-            <section class="sensitivity-section" id="sensitivitySection">
-                <h3>Sensitivity Analysis</h3>
-                <p class="section-subtitle">Impact of variable changes on your investment returns.</p>
-                <div class="sensitivity-grid" id="sensitivityGrid"></div>
-            </section>
+                <section class="sensitivity-section" id="sensitivitySection">
+                    <h3>Sensitivity Analysis</h3>
+                    <p class="section-subtitle">Impact of variable changes on your investment returns.</p>
+                    <div class="sensitivity-grid" id="sensitivityGrid"></div>
+                </section>
+            </details>
 
             <!-- Get Custom Report CTA -->
             <section class="report-cta-section">

@@ -364,6 +364,7 @@ document.addEventListener('DOMContentLoaded', () => {
         rate: document.getElementById('rate'),
         region: document.getElementById('region'),
         breakdownContent: document.getElementById('breakdownContent'),
+        breakdownHeadline: document.getElementById('breakdownHeadline'),
         solarTarget: document.getElementById('solarTarget'),
         solarTargetVal: document.getElementById('solarTargetVal'),
         roofType: document.getElementById('roofType'),
@@ -708,6 +709,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const breakdownEl = document.getElementById('resCostBreakdown');
         if (breakdownEl) breakdownEl.classList.add('hidden');
 
+        // 25-year lifetime breakdown headline (always visible on summary)
+        if (elements.breakdownHeadline) {
+            const netProfit = r.totalLifetimeSavings - r.estimatedSystemCost;
+            elements.breakdownHeadline.textContent = netProfit > 0 ? '+' + formatPHPShort(netProfit) : formatPHPShort(netProfit);
+            elements.breakdownHeadline.classList.toggle('positive', netProfit > 0);
+            elements.breakdownHeadline.classList.toggle('negative', netProfit <= 0);
+        }
+
         // 25-year lifetime breakdown
         if (elements.breakdownContent) {
             const grossLifetime = r.yearlyCumulative.reduce((sum, pt) => sum + (pt.netAnnual + r.annualOM + (pt.year === INVERTER_REPLACEMENT_YEAR ? r.inverterReplacementCost : 0)), 0);
@@ -719,12 +728,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="breakdown-row"><span>Region (PSH)</span><strong>${REGION_LABELS[region] || region} (${psh})</strong></div>
                 <div class="breakdown-row"><span>Initial system cost</span><strong>${formatPHPShort(r.estimatedSystemCost)}</strong></div>
                 <div class="breakdown-row"><span>Year-1 annual savings</span><strong class="positive">+${formatPHPShort(r.annualSavings)}</strong></div>
-                <div class="breakdown-row"><span>Annual O&amp;M</span><strong class="negative">−${formatPHPShort(r.annualOM)}/yr</strong></div>
-                <div class="breakdown-row"><span>Year-12 inverter replacement</span><strong class="negative">−${formatPHPShort(r.inverterReplacementCost)}</strong></div>
+                <div class="breakdown-row"><span>Annual O&amp;M</span><strong class="planned">−${formatPHPShort(r.annualOM)}/yr</strong></div>
+                <div class="breakdown-row"><span>Year-12 inverter replacement</span><strong class="planned">−${formatPHPShort(r.inverterReplacementCost)}</strong></div>
                 <div class="breakdown-divider"></div>
                 <div class="breakdown-row"><span>25-yr gross savings (degraded + inflated)</span><strong class="positive">+${formatPHPShort(grossLifetime)}</strong></div>
-                <div class="breakdown-row"><span>25-yr O&amp;M total</span><strong class="negative">−${formatPHPShort(totalOM)}</strong></div>
-                <div class="breakdown-row"><span>Inverter replacement</span><strong class="negative">−${formatPHPShort(r.inverterReplacementCost)}</strong></div>
+                <div class="breakdown-row"><span>25-yr O&amp;M total</span><strong class="planned">−${formatPHPShort(totalOM)}</strong></div>
+                <div class="breakdown-row"><span>Inverter replacement</span><strong class="planned">−${formatPHPShort(r.inverterReplacementCost)}</strong></div>
                 <div class="breakdown-divider"></div>
                 <div class="breakdown-row"><span>Net 25-yr savings</span><strong class="positive">${formatPHPShort(r.totalLifetimeSavings)}</strong></div>
                 <div class="breakdown-row"><span>Net profit (savings − cost)</span><strong class="positive">${formatPHPShort(r.totalLifetimeSavings - r.estimatedSystemCost)}</strong></div>

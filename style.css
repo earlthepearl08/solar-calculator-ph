@@ -956,13 +956,26 @@ body {
     background: var(--primary);
     color: white;
     border: none;
-    width: 52px;
-    height: 52px;
+    min-width: 52px;
+    min-height: 52px;
+    padding: 0 1rem;
     border-radius: var(--radius-md);
-    font-size: 1.5rem;
     cursor: pointer;
     box-shadow: var(--shadow-lg);
     transition: all 0.2s ease;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: 'Inter', sans-serif;
+}
+.mobile-toggle .mobile-toggle-icon {
+    font-size: 1.5rem;
+    line-height: 1;
+}
+.mobile-toggle .mobile-toggle-label {
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
 }
 
 .mobile-toggle:hover {
@@ -1391,10 +1404,124 @@ body {
 .breakdown-row span { color: var(--text-muted); }
 .breakdown-row strong { color: var(--text-primary, #fff); font-weight: 700; }
 .breakdown-row strong.positive { color: var(--success, #10b981); }
+.breakdown-row strong.planned { color: var(--accent, #f59e0b); }
 .breakdown-row strong.negative { color: var(--danger, #ef4444); }
 .breakdown-divider {
     border-top: 1px dashed rgba(255, 255, 255, 0.1);
     margin: 0.3rem 0;
+}
+
+/* Breakdown summary headline (always visible) */
+.lifetime-breakdown summary {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+.breakdown-summary-label {
+    color: var(--text-muted);
+    font-weight: 600;
+}
+.breakdown-summary-value {
+    font-size: 1rem;
+    font-weight: 800;
+    color: var(--success);
+}
+.breakdown-summary-value.negative { color: var(--danger); }
+.breakdown-summary-hint {
+    margin-left: auto;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Intro lead + new Quick Setup Wizard CTA */
+.intro-lead {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin: 0 0 1rem 0;
+    line-height: 1.4;
+}
+
+/* Tech specs section (moved below ROI) */
+.specs-section {
+    margin: 2rem 0;
+}
+.specs-section h3 {
+    border-left: 4px solid var(--accent);
+    padding-left: 1rem;
+    margin-bottom: 1rem;
+}
+
+/* Advanced analysis wrapper (collapsible compare + sensitivity) */
+.advanced-analysis {
+    margin: 2.5rem 0;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 1rem 1.25rem;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+}
+.advanced-analysis > summary {
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    list-style: none;
+    padding: 0.25rem 0;
+    letter-spacing: 0.02em;
+    user-select: none;
+}
+.advanced-analysis > summary::-webkit-details-marker { display: none; }
+.advanced-analysis > summary::after {
+    content: '▸';
+    float: right;
+    transition: transform 0.2s;
+    color: var(--text-muted);
+}
+.advanced-analysis[open] > summary::after { content: '▾'; }
+.advanced-analysis[open] > summary {
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+}
+.advanced-analysis > section { margin: 1.5rem 0; }
+.advanced-analysis > section:first-of-type { margin-top: 0; }
+
+/* Sidebar Advanced Options (collapsible) */
+.advanced-section {
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+}
+.advanced-section > summary {
+    cursor: pointer;
+    font-size: 0.7rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--text-muted);
+    list-style: none;
+    padding: 0.5rem 0;
+    user-select: none;
+}
+.advanced-section > summary::-webkit-details-marker { display: none; }
+.advanced-section > summary::before {
+    content: '▸ ';
+    transition: transform 0.2s;
+    display: inline-block;
+    margin-right: 0.25rem;
+}
+.advanced-section[open] > summary::before { content: '▾ '; }
+.advanced-content {
+    margin-top: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
 }
 
 /* ==================== REPORT CTA SECTION ==================== */
@@ -2178,18 +2305,21 @@ body {
 }
 
 .btn-wizard {
-    display: inline-block;
-    background: var(--primary);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
     color: white;
     border: none;
-    padding: 0.875rem 2rem;
+    padding: 1rem 2.25rem;
     border-radius: var(--radius-md);
-    font-weight: 700;
-    font-size: 1rem;
+    font-weight: 800;
+    font-size: 1.05rem;
+    letter-spacing: 0.02em;
     cursor: pointer;
     transition: all 0.2s ease;
-    margin-top: 1rem;
-    box-shadow: 0 4px 14px rgba(59, 130, 246, 0.4);
+    margin-top: 0.5rem;
+    box-shadow: 0 6px 18px rgba(59, 130, 246, 0.45);
     font-family: inherit;
 }
 
