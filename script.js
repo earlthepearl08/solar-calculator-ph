@@ -429,16 +429,48 @@ document.addEventListener('DOMContentLoaded', () => {
     const DEFAULTS = {
         projectScale: 'Residential',
         systemType: 'Grid-Tied',
-        bill: '15000',
-        rate: '13.5',
+        bill: '8000',
+        rate: '12',
         solarTarget: '100',
         area: '50',
         wattage: '620',
-        daytimeLoad: '75',
+        daytimeLoad: '40',
         backupHours: '4',
         enableNetMetering: false,
         genCharge: '5.5'
     };
+
+    // Daytime-load handling: Residential uses a fixed hidden default; C&I / Utility
+    // derive the daytime split from the selected operating shift (which sets the slider).
+    const SHIFT_DAYTIME_MAP = { 1: 85, 2: 55, 3: 40 };
+    const RESIDENTIAL_DAYTIME_DEFAULT = 40;
+
+    function setDaytimeSlider(v) {
+        if (!elements.daytimeLoad) return;
+        v = Math.max(0, Math.min(100, parseInt(v, 10) || 0));
+        elements.daytimeLoad.value = v;
+        elements.daytimeLoad.setAttribute('aria-valuenow', v);
+        if (elements.daytimeLoadVal) elements.daytimeLoadVal.value = v;
+        if (typeof updateRangeBackground === 'function') updateRangeBackground(elements.daytimeLoad);
+    }
+
+    function setDaytimeFromShift(shift) {
+        setDaytimeSlider(SHIFT_DAYTIME_MAP[shift] || 55);
+    }
+
+    // Show/hide daytime-split + operating-shift inputs based on project scale,
+    // and keep the effective daytime value in sync.
+    function applyScaleVisibility(scale) {
+        if (scale === 'Residential') {
+            elements.daytimeLoadGroup.classList.add('hidden');
+            elements.shiftGroup.classList.add('hidden');
+            setDaytimeSlider(RESIDENTIAL_DAYTIME_DEFAULT);
+        } else {
+            elements.daytimeLoadGroup.classList.remove('hidden');
+            elements.shiftGroup.classList.remove('hidden');
+            setDaytimeFromShift(currentShift);
+        }
+    }
 
     // ==================== COST CALCULATION ====================
     function getCostPerKwp(scale, capacityKwp) {
@@ -628,13 +660,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const area = Math.max(0, parseFloat(elements.area.value) || 0);
         const wattage = Math.max(100, parseFloat(elements.wattage.value) || 620);
 
-        let daytimeLoadPct;
-        if (scale === 'Residential') {
-            daytimeLoadPct = parseInt(elements.daytimeLoad.value);
-        } else {
-            const shiftToDaytimeMap = { 1: 85, 2: 55, 3: 40 };
-            daytimeLoadPct = shiftToDaytimeMap[currentShift] || 55;
-        }
+        // Daytime split is always read from the slider. For Residential it holds the
+        // fixed hidden default; for C&I / Utility it is set by the operating-shift selector.
+        const daytimeLoadPct = parseInt(elements.daytimeLoad.value);
 
         const backupHours = parseInt(elements.backupHours.value);
         const enableNetMetering = elements.enableNetMetering.checked;
@@ -811,6 +839,8 @@ document.addEventListener('DOMContentLoaded', () => {
         updateComparisonTable(params);
         updateSensitivityAnalysis(params);
         updateRecommendedArea();
+        renderEquipment(scale, type, r);
+        renderFinancing(r.estimatedSystemCost, r.c1MonthlySavings);
 
         saveToLocalStorage();
     }
@@ -904,6 +934,186 @@ document.addEventListener('DOMContentLoaded', () => {
         }).join('');
     }
 
+    // ==================== EQUIPMENT RECOMMENDATION ====================
+    function pickInverter(scale, kWp) {
+        const cfg = window.KINMO_EQUIPMENT;
+        if (!cfg || !cfg.inverterTiers) return null;
+        const tiers = cfg.inverterTiers[scale] || cfg.inverterTiers['Residential'];
+        if (!tiers || !tiers.length) return null;
+        for (const t of tiers) {
+            if (kWp <= t.upToKwp) return { model: t.model, qty: 1, note: '' };
+        }
+        const last = tiers[tiers.length - 1];
+        const qty = Math.max(1, Math.ceil(kWp / last.upToKwp));
+        return { model: last.model, qty: qty, note: qty + ' units to cover ' + kWp.toFixed(1) + ' kWp' };
+    }
+
+    function renderEquipment(scale, type, r) {
+        const cfg = window.KINMO_EQUIPMENT;
+        const grid = document.getElementById('equipmentGrid');
+        const disc = document.getElementById('equipmentDisclaimer');
+        if (!grid) return;
+        if (!cfg) { grid.innerHTML = ''; return; }
+        if (disc && cfg.disclaimer) disc.textContent = cfg.disclaimer;
+
+        if (!r || r.displayKwp <= 0) {
+            grid.innerHTML = '<p class="equipment-empty">Enter your details to see recommended hardware.</p>';
+            return;
+        }
+
+        const watt = parseInt(elements.wattage.value, 10) || 620;
+        const cards = [{
+            label: 'Solar Panels',
+            value: r.displayPanels + ' × ' + watt + 'W',
+            sub: r.displayKwp.toFixed(2) + ' kWp array'
+        }];
+
+        const inv = pickInverter(scale, r.displayKwp);
+        if (inv) {
+            cards.push({
+                label: 'Inverter',
+                value: (inv.qty > 1 ? inv.qty + ' × ' : '') + inv.model,
+                sub: inv.note
+            });
+        }
+
+        if ((type === 'Hybrid' || type === 'Off-Grid') && r.batteryCapacityTotal > 0 && cfg.battery) {
+            const units = Math.max(1, Math.ceil(r.batteryCapacityTotal / cfg.battery.unitKwh));
+            cards.push({
+                label: 'Battery — ' + cfg.battery.brand,
+                value: units + ' × ' + cfg.battery.model,
+                sub: '≈ ' + (units * cfg.battery.unitKwh).toFixed(1) + ' kWh (' + r.batteryCapacityTotal.toFixed(1) + ' kWh required)'
+            });
+        }
+
+        grid.innerHTML = cards.map(c => `
+            <div class="equipment-card">
+                <span class="equipment-label">${c.label}</span>
+                <span class="equipment-value">${c.value}</span>
+                ${c.sub ? '<span class="equipment-sub">' + c.sub + '</span>' : ''}
+            </div>`).join('');
+    }
+
+    // ==================== FINANCING SCENARIO ====================
+    const FIN_DOWNPAYMENT_PCT = 0.20;
+    const FIN_TERM_MONTHS = 60;
+
+    function renderFinancing(systemCost, monthlySavings) {
+        const resEl = document.getElementById('financingResults');
+        const verdictEl = document.getElementById('financingVerdict');
+        const finInterestEl = document.getElementById('finInterest');
+        if (!resEl || !verdictEl) return;
+
+        const interest = Math.max(0, parseFloat(finInterestEl && finInterestEl.value) || 0);
+        const down = systemCost * FIN_DOWNPAYMENT_PCT;
+        const principal = systemCost - down;
+        const r = interest / 100 / 12;
+        const monthly = r > 0
+            ? principal * r / (1 - Math.pow(1 + r, -FIN_TERM_MONTHS))
+            : (FIN_TERM_MONTHS > 0 ? principal / FIN_TERM_MONTHS : 0);
+        const net = monthlySavings - monthly;
+
+        resEl.innerHTML = `
+            <div class="financing-row"><span>Downpayment (20%)</span><strong>${formatPHPShort(down)}</strong></div>
+            <div class="financing-row"><span>Loan amount</span><strong>${formatPHPShort(principal)}</strong></div>
+            <div class="financing-row"><span>Monthly amortization (5 yr @ ${interest}%)</span><strong>${formatPHP(monthly)}</strong></div>
+            <div class="financing-row"><span>Est. monthly savings</span><strong class="positive">${formatPHP(monthlySavings)}</strong></div>
+            <div class="financing-divider"></div>
+            <div class="financing-row financing-net"><span>Net monthly cash flow</span><strong class="${net >= 0 ? 'positive' : 'negative'}">${(net >= 0 ? '+' : '') + formatPHP(net)}</strong></div>
+        `;
+
+        if (systemCost <= 0) { verdictEl.textContent = ''; verdictEl.className = 'financing-verdict'; return; }
+        if (net >= 0) {
+            verdictEl.className = 'financing-verdict positive';
+            verdictEl.innerHTML = '🎉 <strong>Cash-flow positive from day one</strong> — estimated savings cover the loan payment with ' + formatPHPShort(net) + '/mo to spare.';
+        } else {
+            verdictEl.className = 'financing-verdict';
+            verdictEl.innerHTML = 'During the 5-year term the payment is <strong>' + formatPHPShort(-net) + '/mo</strong> more than the savings. Once the loan is fully paid (year 5+), you keep the full <strong>' + formatPHPShort(monthlySavings) + '/mo</strong>.';
+        }
+    }
+
+    const finInterestInput = document.getElementById('finInterest');
+    if (finInterestInput) {
+        finInterestInput.addEventListener('input', () => {
+            const res = window.solarCalcResults || {};
+            renderFinancing(res.estimatedSystemCost || 0, res.monthlySavings || 0);
+        });
+    }
+
+    // ==================== INSTANT PDF REPORT ====================
+    function generatePDF() {
+        if (!window.jspdf || !window.jspdf.jsPDF) {
+            alert('The PDF generator is still loading — please try again in a moment.');
+            return;
+        }
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+        const res = window.solarCalcResults || {};
+        const nameEl = document.getElementById('customerName');
+        const custName = (nameEl && nameEl.value) ? nameEl.value : '';
+        const dateStr = new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
+
+        const pageW = doc.internal.pageSize.getWidth();
+        const left = 48;
+        let y = 56;
+
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(18); doc.setTextColor(20, 30, 55);
+        doc.text('Kinmo PW Corporation', left, y);
+        doc.setFontSize(12); doc.setTextColor(90, 100, 120);
+        y += 20; doc.setFont('helvetica', 'normal');
+        doc.text('Solar Feasibility Report', left, y);
+        doc.setFontSize(9);
+        doc.text(dateStr, pageW - left, 56, { align: 'right' });
+
+        y += 22; doc.setDrawColor(230); doc.line(left, y, pageW - left, y); y += 24;
+
+        if (custName) {
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(20, 30, 55);
+            doc.text('Prepared for: ' + custName, left, y); y += 22;
+        }
+
+        const rows = [
+            ['Project Scale', (res.scale || '—') + ' / ' + (res.type || '—')],
+            ['System Capacity', (res.systemCapacity || 0).toFixed(2) + ' kWp'],
+            ['Number of Panels', String(res.numPanels || 0)],
+            ['Monthly Electricity Bill', formatPHP(res.monthlyBill || 0)],
+            ['Est. Monthly Savings', formatPHP(res.monthlySavings || 0)],
+            ['Est. Annual Savings', formatPHP(res.annualSavings || 0)],
+            ['Bill Offset', (res.billOffset || 0).toFixed(1) + '%'],
+            ['Est. System Cost', formatPHP(res.estimatedSystemCost || 0)],
+            ['Payback Period', (res.paybackYears ? res.paybackYears.toFixed(1) + ' years' : 'N/A')],
+            ['25-Year ROI', (res.roi ? res.roi.toFixed(0) + '%' : 'N/A')],
+            ['25-Year Net Savings', formatPHP(res.lifetimeSavings || 0)],
+            ['Battery Configuration', res.batteryConfig || 'None']
+        ];
+
+        doc.setFontSize(10);
+        rows.forEach((row, i) => {
+            if (i % 2 === 0) { doc.setFillColor(245, 247, 250); doc.rect(left, y - 12, pageW - left * 2, 20, 'F'); }
+            doc.setFont('helvetica', 'normal'); doc.setTextColor(90, 100, 120);
+            doc.text(row[0], left + 8, y + 2);
+            doc.setFont('helvetica', 'bold'); doc.setTextColor(20, 30, 55);
+            doc.text(String(row[1]), pageW - left - 8, y + 2, { align: 'right' });
+            y += 22;
+        });
+
+        y += 12; doc.setDrawColor(230); doc.line(left, y, pageW - left, y); y += 20;
+        doc.setFont('helvetica', 'italic'); doc.setFontSize(8); doc.setTextColor(130, 140, 155);
+        const disclaimer = 'Rough estimate only. Lifetime model assumes 0.4%/yr panel degradation, 4.5%/yr rate inflation, annual O&M, and one inverter replacement at Year 12. Request a formal quotation for final ROI and hardware scope.';
+        doc.text(doc.splitTextToSize(disclaimer, pageW - left * 2), left, y); y += 44;
+
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(20, 30, 55);
+        doc.text('Contact Kinmo PW', left, y); y += 16;
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(90, 100, 120);
+        doc.text('Office: 09778407799 | 09167050208    Sales: 09687269310 (Earl Dy)', left, y); y += 14;
+        doc.text('earldy.kpwunibest@gmail.com', left, y);
+
+        doc.save('Kinmo-Solar-Report.pdf');
+    }
+
+    const btnDownloadPdf = document.getElementById('btnDownloadPdf');
+    if (btnDownloadPdf) btnDownloadPdf.addEventListener('click', generatePDF);
+
     // ==================== LOCAL STORAGE ====================
     function saveToLocalStorage() {
         const state = {
@@ -961,6 +1171,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (val && elements[elKey]) { elements[elKey].value = val; found = true; }
         }
         if (params.get('netmeter') === '1') { elements.enableNetMetering.checked = true; found = true; }
+        const shift = params.get('shift');
+        if (shift) { currentShift = parseInt(shift, 10) || 1; found = true; }
+        const roof = params.get('roof');
+        if (roof && elements.roofType) {
+            updateRoofTypeOptions();
+            elements.roofType.value = roof;
+            found = true;
+        }
         return found;
     }
 
@@ -978,6 +1196,9 @@ document.addEventListener('DOMContentLoaded', () => {
         params.set('backup', elements.backupHours.value);
         if (elements.enableNetMetering.checked) params.set('netmeter', '1');
         params.set('gencharge', elements.genCharge.value);
+        if (elements.roofType) params.set('roof', elements.roofType.value);
+        params.set('shift', currentShift);
+        params.set('view', 'results');
         return window.location.origin + window.location.pathname + '?' + params.toString();
     }
 
@@ -1000,15 +1221,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     elements.projectScale.addEventListener('change', () => {
-        const scale = elements.projectScale.value;
-        if (scale === 'Residential') {
-            elements.daytimeLoadGroup.classList.remove('hidden');
-            elements.shiftGroup.classList.add('hidden');
-        } else {
-            elements.daytimeLoadGroup.classList.add('hidden');
-            elements.shiftGroup.classList.remove('hidden');
-        }
+        applyScaleVisibility(elements.projectScale.value);
         updateBatteryOptions();
+        calculate();
     });
 
     elements.systemType.addEventListener('change', (e) => {
@@ -1115,6 +1330,7 @@ document.addEventListener('DOMContentLoaded', () => {
             shiftOptions.forEach(opt => { opt.classList.remove('active'); opt.setAttribute('aria-checked', 'false'); });
             e.currentTarget.classList.add('active');
             e.currentTarget.setAttribute('aria-checked', 'true');
+            setDaytimeFromShift(currentShift);
             calculate();
         });
         btn.addEventListener('keydown', (e) => {
@@ -1144,8 +1360,7 @@ document.addEventListener('DOMContentLoaded', () => {
             elements.enableNetMetering.checked = DEFAULTS.enableNetMetering;
             elements.genCharge.value = DEFAULTS.genCharge;
             currentShift = 1;
-            elements.daytimeLoadGroup.classList.remove('hidden');
-            elements.shiftGroup.classList.add('hidden');
+            applyScaleVisibility('Residential');
             elements.batterySection.classList.add('hidden');
             elements.offGridInfo.classList.add('hidden');
             elements.genChargeGroup.classList.add('hidden');
@@ -1454,6 +1669,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!wizardModal) return;
         wizardModal.classList.remove('active');
         document.body.style.overflow = '';
+        try { localStorage.setItem('wizardDismissed', '1'); } catch (e) { /* ignore */ }
     }
 
     function goToWizStep(n) {
@@ -1593,13 +1809,7 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.enableNetMetering.checked = wizardState.enableNetMetering;
 
         // Update UI visibility based on wizard selections
-        if (wizardState.projectScale === 'Residential') {
-            elements.daytimeLoadGroup.classList.remove('hidden');
-            elements.shiftGroup.classList.add('hidden');
-        } else {
-            elements.daytimeLoadGroup.classList.add('hidden');
-            elements.shiftGroup.classList.remove('hidden');
-        }
+        applyScaleVisibility(wizardState.projectScale);
 
         if (wizardState.systemType === 'Off-Grid') {
             elements.offGridInfo.classList.remove('hidden');
@@ -1684,19 +1894,340 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // ==================== BILL UPLOAD (AI READER) ====================
+    const billUploadModal = document.getElementById('billUploadModal');
+    if (billUploadModal) {
+        const billFileInput = document.getElementById('billFileInput');
+        const billFileList = document.getElementById('billFileList');
+        const billUploadStep = document.getElementById('billUploadStep');
+        const billLoadingStep = document.getElementById('billLoadingStep');
+        const billConfirmStep = document.getElementById('billConfirmStep');
+        const billError = document.getElementById('billError');
+        const btnExtractBill = document.getElementById('btnExtractBill');
+        const billReadList = document.getElementById('billReadList');
+        const billChartWrap = document.getElementById('billChartWrap');
+        const billUsageChart = document.getElementById('billUsageChart');
+        const billApplyBill = document.getElementById('billApplyBill');
+        const billApplyRate = document.getElementById('billApplyRate');
+        const btnApplyBill = document.getElementById('btnApplyBill');
+        const btnBillBack = document.getElementById('btnBillBack');
+        const billModalClose = document.getElementById('billModalClose');
+        const MAX_BILL_FILES = 12;
+
+        let billFiles = [];
+        let readBills = [];
+        let billUploadContext = 'sidebar';
+
+        function showBillStep(step) {
+            billUploadStep.classList.toggle('hidden', step !== 'upload');
+            billLoadingStep.classList.toggle('hidden', step !== 'loading');
+            billConfirmStep.classList.toggle('hidden', step !== 'confirm');
+        }
+
+        function openBillUpload(context) {
+            billUploadContext = context || 'sidebar';
+            billFiles = [];
+            readBills = [];
+            billFileInput.value = '';
+            renderBillFileList();
+            billError.classList.add('hidden');
+            showBillStep('upload');
+            billUploadModal.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeBillUpload() {
+            billUploadModal.classList.remove('active');
+            // Keep scroll locked if the wizard is still open underneath.
+            const wiz = document.getElementById('wizardModal');
+            if (!wiz || !wiz.classList.contains('active')) document.body.style.overflow = '';
+        }
+
+        function renderBillFileList() {
+            billFileList.innerHTML = billFiles.map((f, i) =>
+                `<div class="bill-file-item"><span class="bill-file-name">${escapeHtml(f.name)}</span>` +
+                `<button type="button" class="bill-file-remove" data-idx="${i}" aria-label="Remove file">&times;</button></div>`
+            ).join('');
+            btnExtractBill.disabled = billFiles.length === 0;
+        }
+
+        function escapeHtml(s) {
+            return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
+
+        billFileList.addEventListener('click', (e) => {
+            const btn = e.target.closest('.bill-file-remove');
+            if (!btn) return;
+            billFiles.splice(parseInt(btn.getAttribute('data-idx'), 10), 1);
+            renderBillFileList();
+        });
+
+        billFileInput.addEventListener('change', () => {
+            billError.classList.add('hidden');
+            const incoming = Array.from(billFileInput.files || []);
+            const room = MAX_BILL_FILES - billFiles.length;
+            if (incoming.length > room) {
+                showBillError('You can upload up to 12 bills at a time — extra files were ignored.');
+            }
+            billFiles = billFiles.concat(incoming.slice(0, Math.max(0, room)));
+            billFileInput.value = '';
+            renderBillFileList();
+        });
+
+        function showBillError(msg) {
+            billError.textContent = msg;
+            billError.classList.remove('hidden');
+        }
+
+        // ---- image handling: downscale photos, pass PDFs through ----
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const r = new FileReader();
+                r.onload = () => resolve(String(r.result).split(',')[1]);
+                r.onerror = () => reject(new Error('read'));
+                r.readAsDataURL(file);
+            });
+        }
+
+        function downscaleImage(file, maxDim = 1600, quality = 0.8) {
+            return new Promise((resolve, reject) => {
+                const url = URL.createObjectURL(file);
+                const img = new Image();
+                img.onload = () => {
+                    URL.revokeObjectURL(url);
+                    const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+                    const w = Math.max(1, Math.round(img.width * scale));
+                    const h = Math.max(1, Math.round(img.height * scale));
+                    const canvas = document.createElement('canvas');
+                    canvas.width = w; canvas.height = h;
+                    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                    try {
+                        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+                        resolve({ mimeType: 'image/jpeg', data: dataUrl.split(',')[1] });
+                    } catch (e) { reject(e); }
+                };
+                img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('image')); };
+                img.src = url;
+            });
+        }
+
+        async function fileToPart(file) {
+            if (file.type === 'application/pdf' || /\.pdf$/i.test(file.name)) {
+                return { mimeType: 'application/pdf', data: await fileToBase64(file) };
+            }
+            try {
+                return await downscaleImage(file);
+            } catch (e) {
+                return { mimeType: file.type || 'image/jpeg', data: await fileToBase64(file) };
+            }
+        }
+
+        async function extractBills() {
+            if (billFiles.length === 0) return;
+            billError.classList.add('hidden');
+            showBillStep('loading');
+            try {
+                const parts = await Promise.all(billFiles.map(fileToPart));
+                const totalChars = parts.reduce((s, p) => s + (p.data ? p.data.length : 0), 0);
+                if (totalChars > 5_500_000) { // ~4MB of binary, under Vercel's ~4.5MB body limit
+                    throw new Error('Those files are a bit large. Please upload fewer bills, or use photos instead of PDFs.');
+                }
+                const resp = await fetch('/api/extract-bill', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ files: parts })
+                });
+                let json = {};
+                try { json = await resp.json(); } catch (e) { json = {}; }
+                if (!resp.ok || !json.ok) {
+                    throw new Error(json.error || 'Could not read the bill. Please enter your details manually.');
+                }
+                const bills = (json.bills || []).filter(Boolean);
+                if (bills.length === 0) {
+                    throw new Error('We could not read any bills from those files. Try clearer photos or enter details manually.');
+                }
+                renderConfirm(bills);
+            } catch (err) {
+                showBillStep('upload');
+                showBillError(err.message || 'Something went wrong. Please enter your details manually.');
+            }
+        }
+
+        function num(v) { const n = parseFloat(v); return isNaN(n) ? 0 : n; }
+
+        function renderConfirm(bills) {
+            readBills = bills.map(b => {
+                const amount = num(b.totalAmountDue);
+                const kwh = num(b.totalKwh);
+                let rate = num(b.effectiveRate);
+                if (rate <= 0 && amount > 0 && kwh > 0) rate = amount / kwh;
+                return {
+                    month: b.billingMonth || '',
+                    amount, kwh, rate,
+                    readable: b.readable !== false,
+                    note: b.note || '',
+                    history: Array.isArray(b.history) ? b.history : []
+                };
+            });
+
+            billReadList.innerHTML = readBills.map((b, i) => {
+                if (!b.readable && b.amount <= 0 && b.kwh <= 0) {
+                    return `<div class="bill-read-item"><span class="bill-read-month">${escapeHtml(b.month || ('Bill ' + (i + 1)))}</span>` +
+                        `<p class="bill-read-unreadable">Couldn't read this one${b.note ? ': ' + escapeHtml(b.note) : '.'} You can still type values manually below.</p></div>`;
+                }
+                return `<div class="bill-read-item">
+                    <span class="bill-read-month">${escapeHtml(b.month || ('Bill ' + (i + 1)))}</span>
+                    <div class="bill-read-fields">
+                        <div class="bill-read-field"><label>Amount (₱)</label><input type="number" step="100" min="0" data-idx="${i}" data-key="amount" value="${Math.round(b.amount)}"></div>
+                        <div class="bill-read-field"><label>kWh used</label><input type="number" step="1" min="0" data-idx="${i}" data-key="kwh" value="${Math.round(b.kwh)}"></div>
+                    </div>
+                    <div class="bill-read-rate" id="billRate${i}">${b.rate > 0 ? '≈ ₱' + b.rate.toFixed(2) + '/kWh' : ''}</div>
+                    ${b.note ? '<div class="bill-read-unreadable">' + escapeHtml(b.note) + '</div>' : ''}
+                </div>`;
+            }).join('');
+
+            recomputeSummary();
+            drawUsageChart();
+            showBillStep('confirm');
+        }
+
+        billReadList.addEventListener('input', (e) => {
+            const input = e.target.closest('input[data-idx]');
+            if (!input) return;
+            const idx = parseInt(input.getAttribute('data-idx'), 10);
+            const key = input.getAttribute('data-key');
+            if (!readBills[idx]) return;
+            readBills[idx][key] = num(input.value);
+            const b = readBills[idx];
+            b.rate = (b.amount > 0 && b.kwh > 0) ? b.amount / b.kwh : 0;
+            const rateEl = document.getElementById('billRate' + idx);
+            if (rateEl) rateEl.textContent = b.rate > 0 ? '≈ ₱' + b.rate.toFixed(2) + '/kWh' : '';
+            recomputeSummary();
+            drawUsageChart();
+        });
+
+        function recomputeSummary() {
+            const valid = readBills.filter(b => b.amount > 0);
+            const avgBill = valid.length ? valid.reduce((s, b) => s + b.amount, 0) / valid.length : 0;
+            const ratesArr = readBills.filter(b => b.rate > 0).map(b => b.rate);
+            const avgRate = ratesArr.length ? ratesArr.reduce((s, r) => s + r, 0) / ratesArr.length : 0;
+            if (avgBill > 0) billApplyBill.value = Math.round(avgBill);
+            if (avgRate > 0) billApplyRate.value = avgRate.toFixed(2);
+        }
+
+        function collectUsagePoints() {
+            const points = [];
+            const seen = new Map();
+            readBills.forEach(b => {
+                (b.history || []).forEach(h => {
+                    const kwh = num(h.kwh);
+                    if (h.month && kwh > 0) { seen.set(String(h.month), kwh); }
+                });
+            });
+            readBills.forEach(b => {
+                if (b.month && b.kwh > 0) seen.set(String(b.month), b.kwh);
+            });
+            for (const [month, kwh] of seen.entries()) points.push({ month, kwh });
+            return points;
+        }
+
+        function drawUsageChart() {
+            const points = collectUsagePoints();
+            if (points.length < 2) { billChartWrap.classList.add('hidden'); return; }
+            billChartWrap.classList.remove('hidden');
+
+            const dpr = window.devicePixelRatio || 1;
+            const cssW = billUsageChart.clientWidth || 380;
+            const cssH = 140;
+            billUsageChart.width = cssW * dpr;
+            billUsageChart.height = cssH * dpr;
+            const ctx = billUsageChart.getContext('2d');
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            ctx.clearRect(0, 0, cssW, cssH);
+
+            const styles = getComputedStyle(document.documentElement);
+            const primary = styles.getPropertyValue('--primary').trim() || '#3b82f6';
+            const muted = styles.getPropertyValue('--text-muted').trim() || '#94a3b8';
+
+            const padL = 8, padR = 8, padT = 16, padB = 26;
+            const chartW = cssW - padL - padR;
+            const chartH = cssH - padT - padB;
+            const maxKwh = Math.max.apply(null, points.map(p => p.kwh)) || 1;
+            const n = points.length;
+            const gap = 6;
+            const barW = Math.max(6, (chartW - gap * (n - 1)) / n);
+
+            points.forEach((p, i) => {
+                const x = padL + i * (barW + gap);
+                const h = (p.kwh / maxKwh) * chartH;
+                const y = padT + chartH - h;
+                ctx.fillStyle = primary;
+                ctx.beginPath();
+                if (ctx.roundRect) ctx.roundRect(x, y, barW, h, 3); else ctx.rect(x, y, barW, h);
+                ctx.fill();
+                // value
+                ctx.fillStyle = muted;
+                ctx.font = '600 8px Inter, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(Math.round(p.kwh), x + barW / 2, y - 3);
+                // month label (short)
+                const label = String(p.month).slice(0, 3);
+                ctx.fillText(label, x + barW / 2, cssH - 8);
+            });
+        }
+
+        function applyBill() {
+            const bill = num(billApplyBill.value);
+            const rate = num(billApplyRate.value);
+            if (bill > 0) elements.bill.value = Math.round(bill);
+            if (rate > 0) elements.rate.value = (Math.round(rate * 100) / 100);
+
+            if (billUploadContext === 'wizard') {
+                const wb = document.getElementById('wizBill');
+                const wr = document.getElementById('wizRate');
+                if (wb && bill > 0) wb.value = Math.round(bill);
+                if (wr && rate > 0) wr.value = (Math.round(rate * 100) / 100);
+                if (typeof wizardState === 'object') {
+                    if (bill > 0) wizardState.bill = Math.round(bill);
+                    if (rate > 0) wizardState.rate = Math.round(rate * 100) / 100;
+                }
+            }
+
+            if (typeof dismissSampleHint === 'function') dismissSampleHint();
+            closeBillUpload();
+            calculate();
+        }
+
+        btnExtractBill.addEventListener('click', extractBills);
+        btnApplyBill.addEventListener('click', applyBill);
+        btnBillBack.addEventListener('click', () => { showBillStep('upload'); });
+        billModalClose.addEventListener('click', closeBillUpload);
+        billUploadModal.addEventListener('click', (e) => { if (e.target === billUploadModal) closeBillUpload(); });
+        window.addEventListener('resize', () => { if (!billChartWrap.classList.contains('hidden')) drawUsageChart(); });
+
+        const btnUploadBillSidebar = document.getElementById('btnUploadBillSidebar');
+        const btnUploadBillWizard = document.getElementById('btnUploadBillWizard');
+        if (btnUploadBillSidebar) btnUploadBillSidebar.addEventListener('click', () => openBillUpload('sidebar'));
+        if (btnUploadBillWizard) btnUploadBillWizard.addEventListener('click', () => openBillUpload('wizard'));
+    }
+
     // ==================== INITIALIZE SAVINGS CHART ====================
     const savingsCanvas = document.getElementById('savingsChart');
     const savingsChart = savingsCanvas ? new SavingsChart(savingsCanvas) : null;
 
     // ==================== INITIALIZATION ====================
     const loadedFromURL = loadFromURL();
-    if (!loadedFromURL) loadFromLocalStorage();
+    const loadedFromStorage = loadedFromURL ? false : loadFromLocalStorage();
+    const isSampleScenario = !loadedFromURL && !loadedFromStorage;
+
+    // Fresh visit: preload the sample scenario's roof/area so results are non-zero.
+    if (isSampleScenario) {
+        elements.roofType.value = '2story';
+        elements.area.value = '50';
+    }
 
     const initScale = elements.projectScale.value;
-    if (initScale !== 'Residential') {
-        elements.daytimeLoadGroup.classList.add('hidden');
-        elements.shiftGroup.classList.remove('hidden');
-    }
+    applyScaleVisibility(initScale);
 
     const initType = elements.systemType.value;
     if (initType === 'Off-Grid') {
@@ -1723,4 +2254,37 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.sidebar input[type="range"]').forEach(updateRangeBackground);
     updateBatteryOptions();
     calculate();
+
+    // ==================== SAMPLE SCENARIO HINT + WIZARD-FIRST ENTRY ====================
+    const sampleHint = document.getElementById('sampleHint');
+
+    function dismissSampleHint() {
+        if (sampleHint && !sampleHint.classList.contains('hidden')) {
+            sampleHint.classList.add('hidden');
+        }
+    }
+
+    if (isSampleScenario && sampleHint) {
+        sampleHint.classList.remove('hidden');
+        // Hide the hint as soon as the user edits anything (real interactions dispatch
+        // input/change/click; our programmatic updates do not).
+        const sidebarContent = document.querySelector('.sidebar-content');
+        ['input', 'change'].forEach(ev => {
+            if (sidebarContent) sidebarContent.addEventListener(ev, dismissSampleHint);
+            if (wizardModal) wizardModal.addEventListener(ev, dismissSampleHint);
+        });
+        document.querySelectorAll('.wizard-option').forEach(btn => btn.addEventListener('click', dismissSampleHint));
+    }
+
+    // First visit (no saved/shared config and wizard not previously dismissed):
+    // lead with the Quick Setup Wizard. Fully dismissible.
+    if (isSampleScenario && !localStorage.getItem('wizardDismissed')) {
+        setTimeout(() => openWizard(), 400);
+    }
+
+    // Shared link: restore inputs AND land the user on the results/analysis view.
+    if (loadedFromURL) {
+        const target = document.querySelector('.roi-section');
+        if (target) setTimeout(() => target.scrollIntoView({ behavior: 'smooth', block: 'start' }), 250);
+    }
 });

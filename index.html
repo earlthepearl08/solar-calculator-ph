@@ -59,15 +59,16 @@
                 <div class="input-group">
                     <label for="bill">Avg. Electricity Bill (PHP)</label>
                     <div class="number-input-wrapper">
-                        <input type="number" id="bill" value="15000" step="500" min="0" aria-label="Average monthly electricity bill in Philippine Pesos">
+                        <input type="number" id="bill" value="8000" step="500" min="0" aria-label="Average monthly electricity bill in Philippine Pesos">
                         <button class="clear-input" data-target="bill" aria-label="Clear bill value">×</button>
                     </div>
+                    <button type="button" class="btn-upload-bill" id="btnUploadBillSidebar" aria-label="Upload a photo of your electricity bill">📸 Upload your bill</button>
                 </div>
 
                 <div class="input-group">
                     <label for="rate">Avg. Monthly Rate (PHP/kWh)</label>
                     <div class="number-input-wrapper">
-                        <input type="number" id="rate" value="13.5" step="0.1" min="1" aria-label="Average electricity rate per kilowatt-hour">
+                        <input type="number" id="rate" value="12" step="0.1" min="1" aria-label="Average electricity rate per kilowatt-hour">
                         <button class="clear-input" data-target="rate" aria-label="Clear rate value">×</button>
                     </div>
                 </div>
@@ -88,6 +89,9 @@
                     </select>
                 </div>
 
+                <details class="sidebar-section" id="sizingSection" open>
+                    <summary>Sizing &amp; Site Details</summary>
+                    <div class="sidebar-section-content">
                 <div class="input-group" id="solarTargetGroup">
                     <label for="solarTarget">Target Solar Coverage <input type="number" id="solarTargetVal" class="inline-range-input" value="100" min="0" max="100" step="1" aria-label="Target solar coverage value">%</label>
                     <input type="range" id="solarTarget" min="0" max="100" value="100" aria-label="Target solar coverage percentage" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100">
@@ -114,9 +118,9 @@
                     <small class="help-text" id="recommendedArea"></small>
                 </div>
 
-                <div class="input-group" id="daytimeLoadGroup">
-                    <label for="daytimeLoad">Daytime Load Split <input type="number" id="daytimeLoadVal" class="inline-range-input" value="75" min="0" max="100" step="1" aria-label="Daytime load split value">%</label>
-                    <input type="range" id="daytimeLoad" min="0" max="100" value="75" aria-label="Percentage of electricity used during daytime" aria-valuemin="0" aria-valuemax="100" aria-valuenow="75">
+                <div class="input-group hidden" id="daytimeLoadGroup">
+                    <label for="daytimeLoad">Daytime Load Split <input type="number" id="daytimeLoadVal" class="inline-range-input" value="40" min="0" max="100" step="1" aria-label="Daytime load split value">%</label>
+                    <input type="range" id="daytimeLoad" min="0" max="100" value="40" aria-label="Percentage of electricity used during daytime" aria-valuemin="0" aria-valuemax="100" aria-valuenow="40">
                     <div class="range-labels"><span>0%</span><span>100%</span></div>
                     <small class="help-text">Percentage of usage during sun hours (8am-4pm).</small>
                 </div>
@@ -155,6 +159,8 @@
                     </div>
                     <small class="help-text" style="display:block; margin-top:-0.5rem;">System automatically selects optimal battery configuration.</small>
                 </div>
+                    </div>
+                </details>
 
                 <!-- Advanced Features -->
                 <details id="advancedSection" class="advanced-section">
@@ -201,6 +207,7 @@
             <div class="intro-box">
                 <p class="intro-lead">See your 25-year solar savings in seconds.</p>
                 <button class="btn-wizard" id="btnWizard" aria-label="Open quick setup wizard">🧙 Quick Setup Wizard</button>
+                <p class="sample-hint hidden" id="sampleHint">✨ Sample scenario — enter your own details to see your numbers.</p>
             </div>
 
             <div id="statusAlerts" aria-live="polite" role="status"></div>
@@ -231,6 +238,29 @@
                     </summary>
                     <div class="breakdown-grid" id="breakdownContent"></div>
                 </details>
+                <details class="financing-panel" id="financingPanel">
+                    <summary>💳 See a financing scenario (illustrative)</summary>
+                    <div class="financing-content">
+                        <div class="financing-controls">
+                            <div class="financing-field">
+                                <label for="finDownpayment">Downpayment</label>
+                                <div class="financing-static" id="finDownpaymentPct">20%</div>
+                            </div>
+                            <div class="financing-field">
+                                <label for="finTerm">Term</label>
+                                <div class="financing-static" id="finTermLabel">5 years</div>
+                            </div>
+                            <div class="financing-field">
+                                <label for="finInterest">Interest rate (%/yr)</label>
+                                <input type="number" id="finInterest" value="10" step="0.5" min="0" max="60" aria-label="Annual interest rate percent">
+                            </div>
+                        </div>
+                        <div class="financing-results" id="financingResults"></div>
+                        <div class="financing-verdict" id="financingVerdict"></div>
+                        <p class="financing-disclaimer">Illustrative estimate only — not a loan offer. Actual terms depend on your financing provider.</p>
+                    </div>
+                </details>
+
                 <p class="roi-disclaimer">* Lifetime model assumes 0.4%/yr panel degradation (premium Tier 1), 4.5%/yr electricity rate inflation (Meralco historical CAGR), annual O&amp;M (0.3–0.9% of system cost depending on scale), and one inverter replacement at Year 12 (~10% of solar cost). Rough estimate only — request a formal quotation for final ROI and hardware scope.</p>
             </section>
 
@@ -260,7 +290,7 @@
                     </div>
 
                     <div class="result-card secondary" id="cardScenario2">
-                        <div id="sc2Active">
+                        <div id="sc2Active" class="hidden">
                             <h4 id="sc2Title">2. With Net Metering</h4>
                             <p class="sc-desc" id="sc2Desc">Exporting surplus energy to the grid</p>
                             <div class="savings-value" id="sc2Monthly">₱ 0.00</div>
@@ -304,6 +334,13 @@
                         <span class="metric-value" id="resStorage">0.0 kWh</span>
                     </div>
                 </div>
+            </section>
+
+            <!-- Indicative Equipment Recommendation -->
+            <section class="equipment-section" id="equipmentSection">
+                <h3>Recommended Equipment</h3>
+                <div class="equipment-grid" id="equipmentGrid"></div>
+                <p class="equipment-disclaimer" id="equipmentDisclaimer">Indicative — final design upon site assessment.</p>
             </section>
 
             <section class="details-section">
@@ -367,10 +404,20 @@
             <footer class="app-footer">
                 <h3>Contact Us</h3>
                 <p>For professional installation and detailed assessments:</p>
-                <a href="https://www.facebook.com/messages/t/kinmopwcorporation?text=Hello!%20I%20used%20your%20Solar%20Feasibility%20Tool%20and%20would%20like%20to%20request%20a%20quote."
-                    class="btn-cta" target="_blank" rel="noopener noreferrer">
-                    💬 Request a Quote from Kinmo
-                </a>
+                <div class="contact-channels">
+                    <a href="https://www.facebook.com/messages/t/kinmopwcorporation?text=Hello!%20I%20used%20your%20Solar%20Feasibility%20Tool%20and%20would%20like%20to%20request%20a%20quote."
+                        class="btn-cta btn-messenger" target="_blank" rel="noopener noreferrer">
+                        💬 Messenger
+                    </a>
+                    <a href="viber://chat?number=%2B639687269310"
+                        class="btn-cta btn-viber" target="_blank" rel="noopener noreferrer">
+                        📞 Viber
+                    </a>
+                    <a href="https://wa.me/639687269310"
+                        class="btn-cta btn-whatsapp" target="_blank" rel="noopener noreferrer">
+                        🟢 WhatsApp
+                    </a>
+                </div>
                 <div class="contact-info">
                     <p><strong>Kinmo PW Corporation</strong></p>
                     <p><strong>Office:</strong> 09778407799 | 09167050208</p>
@@ -421,6 +468,7 @@
                 <div class="success-icon">&#10004;</div>
                 <h4>Report Sent Successfully!</h4>
                 <p>Check your email for your custom solar feasibility report. Our team may also reach out to discuss your project.</p>
+                <button class="btn-report" id="btnDownloadPdf">⬇ Download PDF now</button>
                 <button class="btn-close-modal" id="btnCloseSuccess">Close</button>
             </div>
         </div>
@@ -491,11 +539,11 @@
                 <div class="wizard-inputs">
                     <div class="wizard-input-group">
                         <label for="wizBill">Monthly Bill (PHP)</label>
-                        <input type="number" id="wizBill" value="15000" step="500" min="0">
+                        <input type="number" id="wizBill" value="8000" step="500" min="0">
                     </div>
                     <div class="wizard-input-group">
                         <label for="wizRate">Rate (PHP/kWh)</label>
-                        <input type="number" id="wizRate" value="13.5" step="0.1" min="1">
+                        <input type="number" id="wizRate" value="12" step="0.1" min="1">
                     </div>
                     <div class="wizard-input-group">
                         <label for="wizRegion">Region</label>
@@ -510,6 +558,8 @@
                         </select>
                     </div>
                 </div>
+                <div class="wizard-upload-divider"><span>or</span></div>
+                <button type="button" class="btn-upload-bill wizard-upload-btn" id="btnUploadBillWizard" aria-label="Upload a photo of your electricity bill">📸 Upload your bill instead</button>
             </div>
 
             <!-- Step 4: Physical -->
@@ -580,7 +630,67 @@
         </div>
     </div>
 
+    <!-- Bill Upload (AI reader) Modal -->
+    <div class="modal-overlay bill-modal-overlay" id="billUploadModal" role="dialog" aria-modal="true" aria-labelledby="billModalTitle">
+        <div class="modal-content bill-modal-content">
+            <button class="modal-close" id="billModalClose" aria-label="Close bill upload">&times;</button>
+            <h3 id="billModalTitle">📸 Upload your electricity bill</h3>
+            <p>Upload 1–12 photos or PDFs of your Meralco or co-op bills — we'll read the amount and usage for you.</p>
+
+            <!-- Choose files -->
+            <div id="billUploadStep">
+                <label class="bill-dropzone" id="billDropzone">
+                    <input type="file" id="billFileInput" accept="image/*,application/pdf,.pdf" multiple hidden>
+                    <span class="bill-dropzone-icon" aria-hidden="true">📄</span>
+                    <span class="bill-dropzone-text">Tap to choose photos or PDFs</span>
+                    <span class="bill-dropzone-hint">Up to 12 files (JPG, PNG, PDF)</span>
+                </label>
+                <div class="bill-file-list" id="billFileList"></div>
+                <p class="bill-privacy">🔒 Photos are processed only to read your bill and are <strong>not stored</strong>.</p>
+                <div class="bill-actions">
+                    <button type="button" class="btn-report bill-extract-btn" id="btnExtractBill" disabled>Read my bill</button>
+                </div>
+                <div class="bill-error hidden" id="billError" role="alert"></div>
+            </div>
+
+            <!-- Loading -->
+            <div id="billLoadingStep" class="hidden bill-loading">
+                <div class="bill-spinner" aria-hidden="true"></div>
+                <p>Reading your bill… this can take a few seconds.</p>
+            </div>
+
+            <!-- Confirm -->
+            <div id="billConfirmStep" class="hidden">
+                <h4 class="bill-confirm-title">We read the following — edit anything before applying:</h4>
+                <div class="bill-read-list" id="billReadList"></div>
+                <div class="bill-chart-wrap hidden" id="billChartWrap">
+                    <h5>Monthly usage (kWh)</h5>
+                    <div class="bill-chart-container">
+                        <canvas id="billUsageChart" role="img" aria-label="Monthly electricity usage bar chart"></canvas>
+                    </div>
+                </div>
+                <div class="bill-apply-summary">
+                    <div class="bill-apply-field">
+                        <label for="billApplyBill">Monthly bill to apply (₱)</label>
+                        <input type="number" id="billApplyBill" step="100" min="0">
+                    </div>
+                    <div class="bill-apply-field">
+                        <label for="billApplyRate">Rate to apply (₱/kWh)</label>
+                        <input type="number" id="billApplyRate" step="0.1" min="0">
+                    </div>
+                </div>
+                <p class="bill-privacy">🔒 Photos are processed only to read your bill and are <strong>not stored</strong>.</p>
+                <div class="bill-actions bill-actions-split">
+                    <button type="button" class="btn-close-modal bill-back-btn" id="btnBillBack">Upload again</button>
+                    <button type="button" class="btn-report" id="btnApplyBill">Apply to calculator</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="equipment-config.js"></script>
     <script src="script.js"></script>
 </body>
 

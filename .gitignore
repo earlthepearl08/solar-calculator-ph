@@ -1,0 +1,11 @@
+# Secrets — never commit real API keys (.env.example is the safe template)
+.env
+.env.local
+.env*.local
+
+# Vercel
+.vercel
+
+# Dependencies / OS
+node_modules/
+.DS_Store
