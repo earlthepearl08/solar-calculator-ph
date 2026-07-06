@@ -152,8 +152,17 @@ module.exports = async function handler(req, res) {
 
         if (!gRes.ok) {
             const detail = await gRes.text().catch(() => '');
-            console.error('Gemini error', gRes.status, detail.slice(0, 500));
-            res.status(502).json({ ok: false, error: 'Could not read the bill right now. Please try again or enter details manually.' });
+            console.error('Gemini error', gRes.status, detail.slice(0, 800));
+            // Surface Google's own status/message (diagnostic, never contains the key).
+            let reason = '';
+            try { const j = JSON.parse(detail); reason = (j.error && (j.error.message || j.error.status)) || ''; } catch (e) { /* non-JSON body */ }
+            let hint;
+            if (gRes.status === 400) hint = 'The AI service rejected the request (400) — usually a bad/outdated model name or a malformed request.';
+            else if (gRes.status === 403) hint = 'The AI service rejected the API key (403) — the key is invalid/restricted, or the "Generative Language API" is not enabled for it. Use a key from aistudio.google.com/apikey with no HTTP-referrer restriction.';
+            else if (gRes.status === 404) hint = 'The AI model was not found (404) — the model "' + GEMINI_MODEL + '" may be unavailable for this API version. Try a current one such as gemini-2.5-flash or gemini-1.5-flash.';
+            else if (gRes.status === 429) hint = 'The AI service is rate-limited or out of quota (429) — wait a minute, or check your Google API quota/billing.';
+            else hint = 'The AI service returned an error (' + gRes.status + '). Please try again or enter details manually.';
+            res.status(502).json({ ok: false, error: hint + (reason ? ' [Google: ' + String(reason).slice(0, 160) + ']' : '') });
             return;
         }
 
