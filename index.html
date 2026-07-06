@@ -19,7 +19,7 @@
     <div class="app-container">
         <!-- Mobile Toggle Button -->
         <button class="mobile-toggle" id="mobileToggle" aria-label="Open system inputs">
-            <span class="mobile-toggle-icon" aria-hidden="true">☰</span>
+            <span class="mobile-toggle-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></span>
             <span class="mobile-toggle-label">Inputs</span>
         </button>
         <!-- Sidebar -->
@@ -62,7 +62,7 @@
                         <input type="number" id="bill" value="8000" step="500" min="0" aria-label="Average monthly electricity bill in Philippine Pesos">
                         <button class="clear-input" data-target="bill" aria-label="Clear bill value">×</button>
                     </div>
-                    <button type="button" class="btn-upload-bill" id="btnUploadBillSidebar" aria-label="Upload a photo of your electricity bill">📸 Upload your bill</button>
+                    <button type="button" class="btn-upload-bill" id="btnUploadBillSidebar" aria-label="Upload a photo of your electricity bill">Upload your bill</button>
                 </div>
 
                 <div class="input-group">
@@ -80,12 +80,12 @@
                     </label>
                     <select id="region" aria-label="Project region for solar irradiance">
                         <option value="metro_manila">Metro Manila (PSH 4.3)</option>
-                        <option value="northern_luzon">Northern Luzon (PSH 4.3)</option>
+                        <option value="northern_luzon">Northern Luzon (PSH 4.5)</option>
                         <option value="cordillera">Baguio / Cordillera (PSH 3.8)</option>
                         <option value="central_luzon">Central Luzon (PSH 4.4)</option>
                         <option value="southern_luzon">Southern Luzon (PSH 4.5)</option>
-                        <option value="visayas">Visayas (PSH 4.8)</option>
-                        <option value="mindanao">Mindanao (PSH 5.0)</option>
+                        <option value="visayas">Visayas (PSH 4.5)</option>
+                        <option value="mindanao">Mindanao (PSH 4.5)</option>
                     </select>
                 </div>
 
@@ -206,8 +206,8 @@
 
             <div class="intro-box">
                 <p class="intro-lead">See your 25-year solar savings in seconds.</p>
-                <button class="btn-wizard" id="btnWizard" aria-label="Open quick setup wizard">🧙 Quick Setup Wizard</button>
-                <p class="sample-hint hidden" id="sampleHint">✨ Sample scenario — enter your own details to see your numbers.</p>
+                <button class="btn-wizard" id="btnWizard" aria-label="Open quick setup wizard">Quick Setup Wizard</button>
+                <p class="sample-hint hidden" id="sampleHint">Sample scenario — enter your own details to see your numbers.</p>
             </div>
 
             <div id="statusAlerts" aria-live="polite" role="status"></div>
@@ -239,7 +239,7 @@
                     <div class="breakdown-grid" id="breakdownContent"></div>
                 </details>
                 <details class="financing-panel" id="financingPanel">
-                    <summary>💳 See a financing scenario (illustrative)</summary>
+                    <summary>See a financing scenario (illustrative)</summary>
                     <div class="financing-content">
                         <div class="financing-controls">
                             <div class="financing-field">
@@ -262,6 +262,10 @@
                 </details>
 
                 <p class="roi-disclaimer">* Lifetime model assumes 0.4%/yr panel degradation (premium Tier 1), 4.5%/yr electricity rate inflation (Meralco historical CAGR), annual O&amp;M (0.3–0.9% of system cost depending on scale), and one inverter replacement at Year 12 (~10% of solar cost). Rough estimate only — request a formal quotation for final ROI and hardware scope.</p>
+                <div class="roi-chat-cta">
+                    <span>Questions about your numbers?</span>
+                    <a class="btn-cta btn-messenger" data-chat="messenger" href="https://www.facebook.com/messages/t/kinmopwcorporation" target="_blank" rel="noopener noreferrer">Chat with our team</a>
+                </div>
             </section>
 
             <!-- Savings Projection Chart (visual breakeven right after headline number) -->
@@ -283,7 +287,7 @@
                 <div class="results-grid">
                     <div class="result-card primary" id="cardScenario1">
                         <h4 id="sc1Title">1. Grid-Tied (Direct)</h4>
-                        <p class="sc-desc" id="sc1Desc">Direct self-consumption based on 30% daytime load</p>
+                        <p class="sc-desc" id="sc1Desc">Direct self-consumption during daytime hours</p>
                         <div class="savings-value" id="sc1Monthly">₱ 0.00</div>
                         <div class="offset-badge" id="sc1Offset">0.0% Bill Offset</div>
                         <div class="yearly-est" id="sc1Yearly">Est. ₱ 0 / year</div>
@@ -364,7 +368,7 @@
 
             <!-- Power-user: Comparison + Sensitivity combined into one collapsible -->
             <details class="advanced-analysis" id="advancedAnalysis">
-                <summary>📊 Compare scenarios & what-if analysis</summary>
+                <summary>Compare scenarios & what-if analysis</summary>
                 <section class="comparison-section" id="comparisonSection">
                     <h3>System Type Comparison</h3>
                     <p class="section-subtitle">Same inputs applied across all system types for direct comparison.</p>
@@ -390,6 +394,30 @@
                 </section>
             </details>
 
+            <!-- What you get with Kinmo (trust + brands) -->
+            <section class="trust-section" id="trustSection">
+                <h3>What You Get With Kinmo PW</h3>
+                <div class="trust-grid">
+                    <div class="trust-brands">
+                        <h5>Equipment we install</h5>
+                        <ul class="brand-list">
+                            <li><strong>GoodWe</strong> — Tier-1 hybrid inverters</li>
+                            <li><strong>DYNESS</strong> — LiFePO4 battery storage</li>
+                        </ul>
+                        <p class="brand-diff">Backed by Kinmo PW's own power-quality brands — <strong>Northstar</strong>, <strong>UNI-T</strong> and <strong>YIY</strong> — so your solar runs on clean, stable power.</p>
+                    </div>
+                    <div class="trust-points">
+                        <h5>Why Kinmo PW</h5>
+                        <ul class="trust-list">
+                            <li>Professional installation and on-site assessment</li>
+                            <li>We handle your net-metering application with your utility</li>
+                            <li>Manufacturer-backed equipment warranties</li>
+                            <li>Support across Luzon, Visayas and Mindanao</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
             <!-- Get Custom Report CTA -->
             <section class="report-cta-section">
                 <div class="report-cta-box">
@@ -406,16 +434,16 @@
                 <p>For professional installation and detailed assessments:</p>
                 <div class="contact-channels">
                     <a href="https://www.facebook.com/messages/t/kinmopwcorporation?text=Hello!%20I%20used%20your%20Solar%20Feasibility%20Tool%20and%20would%20like%20to%20request%20a%20quote."
-                        class="btn-cta btn-messenger" target="_blank" rel="noopener noreferrer">
-                        💬 Messenger
+                        class="btn-cta btn-messenger" data-chat="messenger" target="_blank" rel="noopener noreferrer">
+                        Messenger
                     </a>
                     <a href="viber://chat?number=%2B639687269310"
                         class="btn-cta btn-viber" target="_blank" rel="noopener noreferrer">
-                        📞 Viber
+                        Viber
                     </a>
                     <a href="https://wa.me/639687269310"
-                        class="btn-cta btn-whatsapp" target="_blank" rel="noopener noreferrer">
-                        🟢 WhatsApp
+                        class="btn-cta btn-whatsapp" data-chat="whatsapp" target="_blank" rel="noopener noreferrer">
+                        WhatsApp
                     </a>
                 </div>
                 <div class="contact-info">
@@ -465,10 +493,17 @@
                 <p class="form-disclaimer">By submitting, you agree to be contacted by Kinmo PW regarding your solar inquiry.</p>
             </form>
             <div id="reportSuccess" class="hidden">
-                <div class="success-icon">&#10004;</div>
+                <div class="success-icon"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div>
                 <h4>Report Sent Successfully!</h4>
                 <p>Check your email for your custom solar feasibility report. Our team may also reach out to discuss your project.</p>
-                <button class="btn-report" id="btnDownloadPdf">⬇ Download PDF now</button>
+                <button class="btn-report" id="btnDownloadPdf">Download PDF now</button>
+                <div class="success-chat">
+                    <p>Prefer to talk to our team now?</p>
+                    <div class="success-chat-links">
+                        <a class="btn-cta btn-messenger" data-chat="messenger" href="https://www.facebook.com/messages/t/kinmopwcorporation" target="_blank" rel="noopener noreferrer">Messenger</a>
+                        <a class="btn-cta btn-whatsapp" data-chat="whatsapp" href="https://wa.me/639687269310" target="_blank" rel="noopener noreferrer">WhatsApp</a>
+                    </div>
+                </div>
                 <button class="btn-close-modal" id="btnCloseSuccess">Close</button>
             </div>
         </div>
@@ -480,7 +515,7 @@
             <button class="modal-close wizard-close" id="wizardClose" aria-label="Close wizard">&times;</button>
             <h3 id="wizardTitle">Quick Setup Wizard</h3>
 
-            <div class="wizard-progress" role="progressbar" aria-valuemin="1" aria-valuemax="6" aria-valuenow="1">
+            <div class="wizard-progress" role="progressbar" aria-valuemin="1" aria-valuemax="5" aria-valuenow="1">
                 <div class="wizard-progress-bar" id="wizardProgressBar"></div>
                 <div class="wizard-steps-indicator">
                     <span class="wizard-dot active" data-step="1">1</span>
@@ -488,7 +523,6 @@
                     <span class="wizard-dot" data-step="3">3</span>
                     <span class="wizard-dot" data-step="4">4</span>
                     <span class="wizard-dot" data-step="5">5</span>
-                    <span class="wizard-dot" data-step="6">6</span>
                 </div>
             </div>
 
@@ -559,13 +593,13 @@
                     </div>
                 </div>
                 <div class="wizard-upload-divider"><span>or</span></div>
-                <button type="button" class="btn-upload-bill wizard-upload-btn" id="btnUploadBillWizard" aria-label="Upload a photo of your electricity bill">📸 Upload your bill instead</button>
+                <button type="button" class="btn-upload-bill wizard-upload-btn" id="btnUploadBillWizard" aria-label="Upload a photo of your electricity bill">Upload your bill instead</button>
             </div>
 
             <!-- Step 4: Physical -->
             <div class="wizard-step" id="wizStep4" role="group" aria-labelledby="wizStep4Title">
                 <h4 id="wizStep4Title">Physical constraints</h4>
-                <p>Tell us about your available space and panel preference.</p>
+                <p>Tell us about your available roof or land area.</p>
                 <div class="wizard-inputs">
                     <div class="wizard-input-group">
                         <label for="wizRoofType">Roof / Site Type</label>
@@ -582,42 +616,12 @@
                         <input type="number" id="wizArea" value="50" step="5" min="0">
                         <small class="help-text" id="wizRecommendedArea"></small>
                     </div>
-                    <div class="wizard-input-group">
-                        <label for="wizWattage">Panel Wattage (Wp)</label>
-                        <input type="number" id="wizWattage" value="620" step="10" min="100">
-                    </div>
                 </div>
             </div>
 
-            <!-- Step 5: Advanced -->
+            <!-- Step 5: Summary -->
             <div class="wizard-step" id="wizStep5" role="group" aria-labelledby="wizStep5Title">
-                <h4 id="wizStep5Title">Advanced options</h4>
-                <p>Fine-tune your analysis or keep the defaults.</p>
-                <div class="wizard-inputs">
-                    <div class="wizard-input-group">
-                        <label for="wizSolarTarget">Solar Coverage Target: <span id="wizSolarTargetVal">100</span>%</label>
-                        <input type="range" id="wizSolarTarget" min="0" max="100" value="100">
-                    </div>
-                    <div class="wizard-input-group">
-                        <label for="wizDaytimeLoad">Daytime Load: <span id="wizDaytimeLoadVal">75</span>%</label>
-                        <input type="range" id="wizDaytimeLoad" min="0" max="100" value="75">
-                    </div>
-                    <div class="wizard-input-group hidden" id="wizBatteryGroup">
-                        <label for="wizBackupHours">Backup Hours: <span id="wizBackupHoursVal">4</span>h</label>
-                        <input type="range" id="wizBackupHours" min="1" max="24" value="4">
-                    </div>
-                    <div class="wizard-input-group">
-                        <label class="wizard-checkbox">
-                            <input type="checkbox" id="wizNetMetering">
-                            Enable Net Metering
-                        </label>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Step 6: Summary -->
-            <div class="wizard-step" id="wizStep6" role="group" aria-labelledby="wizStep6Title">
-                <h4 id="wizStep6Title">Your Configuration Summary</h4>
+                <h4 id="wizStep5Title">Your Configuration Summary</h4>
                 <div class="wizard-summary" id="wizardSummary"></div>
             </div>
 
@@ -634,19 +638,19 @@
     <div class="modal-overlay bill-modal-overlay" id="billUploadModal" role="dialog" aria-modal="true" aria-labelledby="billModalTitle">
         <div class="modal-content bill-modal-content">
             <button class="modal-close" id="billModalClose" aria-label="Close bill upload">&times;</button>
-            <h3 id="billModalTitle">📸 Upload your electricity bill</h3>
+            <h3 id="billModalTitle">Upload your electricity bill</h3>
             <p>Upload 1–12 photos or PDFs of your Meralco or co-op bills — we'll read the amount and usage for you.</p>
 
             <!-- Choose files -->
             <div id="billUploadStep">
                 <label class="bill-dropzone" id="billDropzone">
                     <input type="file" id="billFileInput" accept="image/*,application/pdf,.pdf" multiple hidden>
-                    <span class="bill-dropzone-icon" aria-hidden="true">📄</span>
+                    <span class="bill-dropzone-icon" aria-hidden="true"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z"/><path d="M12 18v-6"/><path d="M9.5 14.5 12 12l2.5 2.5"/></svg></span>
                     <span class="bill-dropzone-text">Tap to choose photos or PDFs</span>
                     <span class="bill-dropzone-hint">Up to 12 files (JPG, PNG, PDF)</span>
                 </label>
                 <div class="bill-file-list" id="billFileList"></div>
-                <p class="bill-privacy">🔒 Photos are processed only to read your bill and are <strong>not stored</strong>.</p>
+                <p class="bill-privacy">Photos are processed only to read your bill and are <strong>not stored</strong>.</p>
                 <div class="bill-actions">
                     <button type="button" class="btn-report bill-extract-btn" id="btnExtractBill" disabled>Read my bill</button>
                 </div>
@@ -679,7 +683,7 @@
                         <input type="number" id="billApplyRate" step="0.1" min="0">
                     </div>
                 </div>
-                <p class="bill-privacy">🔒 Photos are processed only to read your bill and are <strong>not stored</strong>.</p>
+                <p class="bill-privacy">Photos are processed only to read your bill and are <strong>not stored</strong>.</p>
                 <div class="bill-actions bill-actions-split">
                     <button type="button" class="btn-close-modal bill-back-btn" id="btnBillBack">Upload again</button>
                     <button type="button" class="btn-report" id="btnApplyBill">Apply to calculator</button>

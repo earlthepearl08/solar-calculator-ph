@@ -1,30 +1,23 @@
-# 📋 Project Task Tracker
-> 🎨 **Visual Planner**: Run `streamlit run planner.py` to see your interactive dashboard.
+# Task Tracker
 
+Shared to-do list for the Solar Feasibility Tool. See `README.md` for architecture.
 
-This file serves as our shared to-do list and memory bank. I will use this to keep track of what needs to be done, where important files are, and what we've already accomplished.
+## File map
+- **UI:** `index.html`
+- **App logic (sizing, ROI, charts, wizard, bill reader, PDF, email):** `script.js`
+- **Styles:** `style.css`
+- **Hardware recommendation SKUs:** `equipment-config.js`
+- **AI bill OCR (Vercel serverless):** `api/extract-bill.js`
 
-## 🚀 Active Tasks
-*Add new tasks here. Mention specific files and the next steps.*
+## Active
+- [x] **Lead delivery:** each submitted lead is emailed to `notifyEmail` in `script.js`
+      (currently `earldy.kpwunibest@gmail.com`) using the existing template, with reply_to set to
+      the customer. Change `notifyEmail` to route leads to a different inbox.
+- [ ] **AI bill reader:** after adding `GEMINI_API_KEY` in Vercel, **redeploy** (env vars only
+      apply to deployments built after they are added) — Deployments tab → ⋯ → Redeploy.
 
-- [ ] **Sample Task**: Example of a task. | **Files**: `example.py` | **Status**: Pending
-
-## 📅 Calendar & Deadlines
-*Record any upcoming deadlines or scheduled work here.*
-
-- **No deadlines set yet.**
-
-## 📂 File Map
-*Quick reference for where key things are located.*
-
-- **Core Logic**: `app.py`, `script.js`
-- **Calculations**: `pro_sizing_tool/sizing_tool.py`
-- **Assets**: `logo.png`, `pro_sizing_tool/*.png`
-
-## ✅ Completed
-*Completed items for historical reference.*
-
-- [x] Initial Task Tracker Setup
-
----
-*Last Updated: 2026-01-16*
+## Backlog (from the 2026-07 review)
+- [ ] Durable lead sink (Google Sheet / Airtable) via a `/api/lead.js` function.
+- [ ] Trim the setup wizard to ~3 residential steps.
+- [ ] Add a "Book a free site assessment" action.
+- [ ] Add qualifier fields to the lead form (timeframe, budget band, preferred channel).

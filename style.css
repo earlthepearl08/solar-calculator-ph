@@ -538,6 +538,69 @@ body {
     color: var(--accent-light);
 }
 
+.status-alert.surplus-info {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.05) 100%);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    color: #6ee7b7;
+}
+
+/* ==================== TRUST / BRANDS STRIP ==================== */
+.trust-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1rem;
+}
+.trust-brands, .trust-points {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 1.25rem 1.5rem;
+}
+.trust-brands h5, .trust-points h5 {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    margin: 0 0 0.75rem;
+}
+.brand-list, .trust-list { list-style: none; margin: 0; padding: 0; }
+.brand-list li, .trust-list li {
+    padding: 0.3rem 0;
+    color: var(--text-secondary);
+    font-size: 0.92rem;
+    line-height: 1.45;
+}
+.brand-list strong { color: var(--text-primary); }
+.trust-list li { display: flex; gap: 0.5rem; }
+.trust-list li::before { content: '—'; color: var(--success-light); }
+.brand-diff {
+    margin: 0.85rem 0 0;
+    padding-top: 0.85rem;
+    border-top: 1px solid var(--border-light);
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+.brand-diff strong { color: var(--accent-light); }
+
+/* Inline chat CTA under the ROI results */
+.roi-chat-cta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 1.1rem;
+}
+.roi-chat-cta span { color: var(--text-secondary); font-size: 0.92rem; }
+.roi-chat-cta .btn-cta { flex: 0 0 auto; padding: 0.6rem 1.25rem; font-size: 0.9rem; }
+
+/* Chat CTA on the report success screen */
+.success-chat { margin: 1.25rem 0 0.5rem; }
+.success-chat p { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.5rem; }
+.success-chat-links { display: flex; gap: 0.5rem; }
+.success-chat-links .btn-cta { flex: 1; padding: 0.6rem; font-size: 0.9rem; }
+
 /* ==================== METRICS GRID ==================== */
 .metrics-grid {
     display: grid;

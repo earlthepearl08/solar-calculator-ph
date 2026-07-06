@@ -4,7 +4,11 @@ document.addEventListener('DOMContentLoaded', () => {
         publicKey: '4b7a3sQV-LmDcToos',
         serviceId: 'service_sx1yj4d',
         customerTemplateId: 'template_4ogepjc',
-        notifyTemplateId: 'template_4ogepjc'
+        // Sales notifications reuse the same working template, but addressed to notifyEmail
+        // (the Kinmo inbox) with reply_to set to the customer — so no extra EmailJS template
+        // is needed. To route leads to a different inbox, just change notifyEmail below.
+        notifyTemplateId: 'template_4ogepjc',
+        notifyEmail: 'earldy.kpwunibest@gmail.com'
     };
 
     // Initialize EmailJS
@@ -15,12 +19,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==================== CONSTANTS ====================
     const REGION_PSH = {
         metro_manila: 4.3,
-        northern_luzon: 4.3,
+        northern_luzon: 4.5,
         cordillera: 3.8,
         central_luzon: 4.4,
         southern_luzon: 4.5,
-        visayas: 4.8,
-        mindanao: 5.0
+        visayas: 4.5,
+        mindanao: 4.5
     };
     const REGION_LABELS = {
         metro_manila: 'Metro Manila',
@@ -562,12 +566,18 @@ document.addEventListener('DOMContentLoaded', () => {
         const directConsumedKwh = Math.min(effectiveDailySolarKwh, daytimeLoadKwh);
         const surplusSolarKwh = Math.max(0, effectiveDailySolarKwh - daytimeLoadKwh);
 
-        const avgHourlyLoad = dailyKwh / 24;
-        const backupStorageNeeded = avgHourlyLoad * backupHours;
+        // Backup is sized off the heavier evening/night load (concentrated over ~6h), not the
+        // 24h average, and grossed up by depth-of-discharge so usable capacity meets the need.
+        const EVENING_HOURS = 6;
+        const eveningHourlyLoad = EVENING_HOURS > 0 ? nighttimeLoadKwh / EVENING_HOURS : 0;
+        const backupStorageNeeded = eveningHourlyLoad * backupHours;
 
         let optimalBattery;
-        if (type === 'Hybrid' || type === 'Off-Grid') {
-            optimalBattery = findOptimalBattery(backupStorageNeeded, scale);
+        if (type === 'Off-Grid') {
+            // Off-grid must carry the full nighttime load until the sun returns.
+            optimalBattery = findOptimalBattery(nighttimeLoadKwh / BATTERY_DOD, scale);
+        } else if (type === 'Hybrid') {
+            optimalBattery = findOptimalBattery(backupStorageNeeded / BATTERY_DOD, scale);
         } else {
             optimalBattery = findOptimalBattery(surplusSolarKwh, scale);
         }
@@ -606,12 +616,18 @@ document.addEventListener('DOMContentLoaded', () => {
             c2Offset = dailyKwh > 0 ? (effectiveDailySolarKwh / dailyKwh * 100) : 0;
         }
 
+        // The headline economics (payback, ROI, 25-yr chart, comparison, financing, PDF) follow
+        // the ACTUAL configuration: net-metered savings when net metering is on, else direct
+        // self-consumption. This keeps every decision surface consistent with each other.
+        const effectiveMonthlySavings = (type !== 'Off-Grid' && enableNetMetering) ? c2MonthlySavings : c1MonthlySavings;
+        const effectiveOffset = (type !== 'Off-Grid' && enableNetMetering) ? c2Offset : c1Offset;
+
         const costPerKwp = getCostPerKwp(scale, displayKwp);
         const solarCost = displayKwp * costPerKwp;
         const batteryCost = (type !== 'Grid-Tied' && batteryCapacityTotal > 0)
             ? batteryCapacityTotal * getBatteryCostPerKwh(scale) : 0;
         const estimatedSystemCost = solarCost + batteryCost;
-        const annualSavings = c1MonthlySavings * 12;
+        const annualSavings = effectiveMonthlySavings * 12;
 
         // Realistic lifetime model: panel degradation, rate inflation, O&M, inverter replacement
         const annualOM = estimatedSystemCost * getOMRatePerYear(scale);
@@ -643,7 +659,7 @@ document.addEventListener('DOMContentLoaded', () => {
             effectiveDailySolarKwh, directConsumedKwh, surplusSolarKwh,
             batteryCapacityTotal, numBatt, batteryUnitLabel, usableBatteryKwh, batteryShiftedKwh,
             c1Title, c1Desc, c1DailySavingsKwh, c1MonthlySavings, c1Offset, residualSurplusKwh,
-            c2MonthlySavings, c2Offset,
+            c2MonthlySavings, c2Offset, effectiveMonthlySavings, effectiveOffset,
             solarCost, batteryCost, estimatedSystemCost, costPerKwp, paybackYears, roi, annualSavings, totalLifetimeSavings,
             yearlyCumulative, annualOM, inverterReplacementCost,
             batteryConfig, isSpaceLimited, numPanelsRequired, cappedPanelsPossible
@@ -776,9 +792,9 @@ document.addEventListener('DOMContentLoaded', () => {
             areaUsed: r.displayArea,
             monthlyBill: bill, rate,
             monthlyGeneration: r.effectiveDailySolarKwh * DAYS_PER_MONTH,
-            monthlySavings: r.c1MonthlySavings,
+            monthlySavings: r.effectiveMonthlySavings,
             annualSavings: r.annualSavings,
-            billOffset: Math.min(r.c1Offset, 100),
+            billOffset: Math.min(r.effectiveOffset, 100),
             estimatedSystemCost: r.estimatedSystemCost, costPerKwp: r.costPerKwp,
             paybackYears: r.paybackYears, roi: r.roi,
             lifetimeSavings: r.totalLifetimeSavings,
@@ -834,13 +850,24 @@ document.addEventListener('DOMContentLoaded', () => {
             elements.statusAlerts.appendChild(warning);
         }
 
+        // Honest surplus notice: a grid-tied system with no net metering wastes daytime surplus.
+        if (type === 'Grid-Tied' && !enableNetMetering && r.surplusSolarKwh > 0.15 * r.effectiveDailySolarKwh) {
+            const wastedKwhMo = r.surplusSolarKwh * DAYS_PER_MONTH;
+            const potentialCredit = wastedKwhMo * genChargeRate;
+            const info = document.createElement('div');
+            info.className = 'status-alert surplus-info';
+            info.innerHTML = `<strong>You'd generate more than your daytime usage.</strong> About <strong>${wastedKwhMo.toFixed(0)} kWh/mo</strong> of solar would go unused. Turn on <strong>Net Metering</strong> to sell it back (≈ ${formatPHP(potentialCredit)}/mo credit), add a battery to store it, or reduce your Target Solar Coverage.`;
+            elements.statusAlerts.appendChild(info);
+        }
+
         // Update Phase 6 features
         if (savingsChart) savingsChart.update({ yearlyCumulative: r.yearlyCumulative, estimatedSystemCost: r.estimatedSystemCost, paybackYears: r.paybackYears, annualSavings: r.annualSavings });
         updateComparisonTable(params);
         updateSensitivityAnalysis(params);
         updateRecommendedArea();
         renderEquipment(scale, type, r);
-        renderFinancing(r.estimatedSystemCost, r.c1MonthlySavings);
+        renderFinancing(r.estimatedSystemCost, r.effectiveMonthlySavings);
+        updateContactLinks();
 
         saveToLocalStorage();
     }
@@ -866,7 +893,7 @@ document.addEventListener('DOMContentLoaded', () => {
             { label: 'Panels Required', fn: r => r.displayPanels.toString() },
             { label: 'Area Used', fn: r => r.displayArea.toFixed(1) + ' m\u00B2' },
             { label: 'Est. System Cost', fn: r => formatPHPShort(r.estimatedSystemCost) },
-            { label: 'Monthly Savings', fn: r => formatPHP(r.c1MonthlySavings) },
+            { label: 'Monthly Savings', fn: r => formatPHP(r.effectiveMonthlySavings) },
             { label: 'Payback Period', fn: r => r.paybackYears > 0 ? r.paybackYears.toFixed(1) + ' years' : 'N/A' },
             { label: '25-Year ROI', fn: r => r.roi > 0 ? r.roi.toFixed(0) + '%' : 'N/A' },
             { label: 'Battery Config', fn: r => r.batteryConfig }
@@ -920,7 +947,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <td>${variable.format(modParams[variable.key])}</td>
                     <td>${res.paybackYears > 0 ? res.paybackYears.toFixed(1) + 'y' : 'N/A'}</td>
                     <td>${res.roi > 0 ? res.roi.toFixed(0) + '%' : 'N/A'}</td>
-                    <td>${formatPHPShort(res.c1MonthlySavings)}</td>
+                    <td>${formatPHPShort(res.effectiveMonthlySavings)}</td>
                 </tr>`;
             }).join('');
 
@@ -1025,7 +1052,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (systemCost <= 0) { verdictEl.textContent = ''; verdictEl.className = 'financing-verdict'; return; }
         if (net >= 0) {
             verdictEl.className = 'financing-verdict positive';
-            verdictEl.innerHTML = '🎉 <strong>Cash-flow positive from day one</strong> — estimated savings cover the loan payment with ' + formatPHPShort(net) + '/mo to spare.';
+            verdictEl.innerHTML = '<strong>Cash-flow positive from day one</strong> — estimated savings cover the loan payment with ' + formatPHPShort(net) + '/mo to spare.';
         } else {
             verdictEl.className = 'financing-verdict';
             verdictEl.innerHTML = 'During the 5-year term the payment is <strong>' + formatPHPShort(-net) + '/mo</strong> more than the savings. Once the loan is fully paid (year 5+), you keep the full <strong>' + formatPHPShort(monthlySavings) + '/mo</strong>.';
@@ -1472,6 +1499,47 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnCloseSuccess) btnCloseSuccess.addEventListener('click', closeModal);
     reportModal?.addEventListener('click', (e) => { if (e.target === reportModal) closeModal(); });
 
+    // ==================== LEAD CAPTURE HELPERS ====================
+    const KINMO_MESSENGER_URL = 'https://www.facebook.com/messages/t/kinmopwcorporation';
+
+    // Short, sales-ready summary of the current computed result — used for chat prefills.
+    function buildLeadMessage(results) {
+        const r = results || window.solarCalcResults || {};
+        const parts = ['Hi Kinmo PW! I used your Solar Feasibility Tool and would like a quote.'];
+        if (r.systemCapacity) parts.push('System ~' + Number(r.systemCapacity).toFixed(2) + ' kWp ' + (r.type || ''));
+        if (r.monthlyBill) parts.push('Bill ' + formatPHP(r.monthlyBill));
+        if (r.monthlySavings) parts.push('Est. savings ' + formatPHP(r.monthlySavings) + '/mo');
+        if (r.paybackYears) parts.push('Payback ' + Number(r.paybackYears).toFixed(1) + ' yrs');
+        return parts.join(' — ');
+    }
+
+    // Keep a local record of captured leads so a network/email failure never loses one.
+    function persistLeadLocally(customerInfo, results) {
+        try {
+            const r = results || {};
+            const entry = {
+                ts: new Date().toISOString(),
+                name: customerInfo.name, email: customerInfo.email,
+                phone: customerInfo.phone, location: customerInfo.location,
+                systemCapacity: r.systemCapacity, type: r.type, scale: r.scale,
+                monthlyBill: r.monthlyBill, monthlySavings: r.monthlySavings,
+                estimatedSystemCost: r.estimatedSystemCost, paybackYears: r.paybackYears, roi: r.roi
+            };
+            const key = 'kinmo_solar_leads';
+            const arr = JSON.parse(localStorage.getItem(key) || '[]');
+            arr.push(entry);
+            localStorage.setItem(key, JSON.stringify(arr.slice(-50)));
+        } catch (e) { /* localStorage unavailable — non-fatal */ }
+    }
+
+    // Inject the computed result into every chat deep-link so sales opens with full context.
+    function updateContactLinks() {
+        const enc = encodeURIComponent(buildLeadMessage(window.solarCalcResults));
+        document.querySelectorAll('[data-chat="messenger"]').forEach(a => { a.href = KINMO_MESSENGER_URL + '?text=' + enc; });
+        document.querySelectorAll('[data-chat="whatsapp"]').forEach(a => { a.href = 'https://wa.me/639687269310?text=' + enc; });
+        // Viber deep links don't reliably accept prefilled text — keep the plain contact link.
+    }
+
     if (reportForm) {
         reportForm.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -1511,17 +1579,57 @@ document.addEventListener('DOMContentLoaded', () => {
                     battery_config: results.batteryConfig || 'None'
                 };
 
-                if (window.emailjs && EMAILJS_CONFIG.publicKey !== 'YOUR_PUBLIC_KEY') {
-                    await emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.customerTemplateId, templateParams);
+                // Sales-notification params: same system spec + lead contact details + reply_to.
+                const notifyParams = Object.assign({}, templateParams, {
+                    to_email: EMAILJS_CONFIG.notifyEmail,
+                    to_name: 'Kinmo Sales — new lead: ' + (customerInfo.name || 'Unknown'),
+                    reply_to: customerInfo.email,
+                    lead_name: customerInfo.name,
+                    lead_email: customerInfo.email,
+                    lead_phone: customerInfo.phone || 'Not provided',
+                    lead_location: customerInfo.location || 'Not provided',
+                    monthly_bill: formatPHP(results.monthlyBill || 0)
+                });
+
+                // Always keep a local copy so a failed send never loses the lead.
+                persistLeadLocally(customerInfo, results);
+
+                const emailReady = window.emailjs && EMAILJS_CONFIG.publicKey !== 'YOUR_PUBLIC_KEY';
+                const notifyReady = emailReady && !!EMAILJS_CONFIG.notifyEmail;
+                let delivered = false;
+
+                if (emailReady) {
+                    // 1) Notify Kinmo sales FIRST — this is the whole point of the tool.
+                    if (notifyReady) {
+                        try {
+                            await emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.notifyTemplateId, notifyParams);
+                            delivered = true;
+                        } catch (err) { console.error('Sales notification failed:', err); }
+                    } else {
+                        console.warn('notifyTemplateId not configured — sales will NOT be notified. See README.');
+                    }
+                    // 2) Send the customer their own copy of the report.
+                    try {
+                        await emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.customerTemplateId, templateParams);
+                        delivered = true;
+                    } catch (err) { console.error('Customer report email failed:', err); }
                 } else {
-                    console.warn('EmailJS not configured. Report data logged to console.');
-                    console.log('Report for:', customerInfo.name, templateParams);
+                    console.warn('EmailJS not configured. Lead saved locally only.');
+                    console.log('Lead:', customerInfo.name, notifyParams);
+                    delivered = true; // treat as handled in dev / unconfigured environments
                 }
-                reportForm.classList.add('hidden');
-                reportSuccess.classList.remove('hidden');
+
+                if (delivered) {
+                    reportForm.classList.add('hidden');
+                    reportSuccess.classList.remove('hidden');
+                } else {
+                    // Total email failure — route the lead to sales via Messenger as a fallback.
+                    const proceed = confirm('We had trouble sending your report by email. Tap OK to message the Kinmo team directly on Messenger with your details, or Cancel to try again.');
+                    if (proceed) window.open(KINMO_MESSENGER_URL + '?text=' + encodeURIComponent(buildLeadMessage(results)), '_blank', 'noopener');
+                }
             } catch (error) {
                 console.error('Error sending report:', error);
-                alert('Error sending report. Please try again or contact support.');
+                alert('Something went wrong. Please try again, or contact us on Messenger / Viber / WhatsApp below.');
             } finally {
                 btnSubmitText.classList.remove('hidden');
                 btnSubmitLoading.classList.add('hidden');
@@ -1540,7 +1648,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const wizardSteps = document.querySelectorAll('.wizard-step');
     const wizardDots = document.querySelectorAll('.wizard-dot');
     const wizardProgressBar = document.getElementById('wizardProgressBar');
-    const WIZ_TOTAL_STEPS = 6;
+    const WIZ_TOTAL_STEPS = 5;
     let wizCurrentStep = 1;
 
     const wizardState = {
@@ -1548,7 +1656,7 @@ document.addEventListener('DOMContentLoaded', () => {
         systemType: 'Grid-Tied',
         bill: 15000, rate: 13.5,
         area: 50, wattage: 620,
-        solarTarget: 100, daytimeLoad: 75,
+        solarTarget: 100, daytimeLoad: 40,
         backupHours: 4, enableNetMetering: false,
         region: 'metro_manila'
     };
@@ -1564,7 +1672,7 @@ document.addEventListener('DOMContentLoaded', () => {
         wizardState.area = parseFloat(elements.area.value) || 50;
         wizardState.wattage = parseFloat(elements.wattage.value) || 620;
         wizardState.solarTarget = parseInt(elements.solarTarget.value) || 100;
-        wizardState.daytimeLoad = parseInt(elements.daytimeLoad.value) || 75;
+        wizardState.daytimeLoad = parseInt(elements.daytimeLoad.value) || 40;
         wizardState.backupHours = parseInt(elements.backupHours.value) || 4;
         wizardState.enableNetMetering = elements.enableNetMetering.checked;
 
@@ -1669,7 +1777,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!wizardModal) return;
         wizardModal.classList.remove('active');
         document.body.style.overflow = '';
-        try { localStorage.setItem('wizardDismissed', '1'); } catch (e) { /* ignore */ }
     }
 
     function goToWizStep(n) {
@@ -1685,23 +1792,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (wizNext) wizNext.classList.toggle('hidden', n === WIZ_TOTAL_STEPS);
         if (wizFinish) wizFinish.classList.toggle('hidden', n !== WIZ_TOTAL_STEPS);
 
-        // Step 5: Show/hide battery group based on system type
-        if (n === 5) {
-            const battGroup = document.getElementById('wizBatteryGroup');
-            if (battGroup) battGroup.classList.toggle('hidden', wizardState.systemType === 'Grid-Tied');
-            const wizST = document.getElementById('wizSolarTarget');
-            if (wizardState.systemType === 'Off-Grid' && wizST) {
-                wizST.value = 100;
-                wizST.disabled = true;
-                const wizSTV = document.getElementById('wizSolarTargetVal');
-                if (wizSTV) wizSTV.textContent = '100';
-                wizardState.solarTarget = 100;
-            } else if (wizST) {
-                wizST.disabled = false;
-            }
-        }
-
-        // Step 6: Generate summary
+        // Final step: generate the summary
         if (n === WIZ_TOTAL_STEPS) {
             generateWizardSummary();
         }
@@ -1776,7 +1867,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <div class="wizard-summary-item">
                     <span class="wizard-summary-label">Monthly Savings</span>
-                    <span class="wizard-summary-value highlight-success">${formatPHP(r.c1MonthlySavings)}</span>
+                    <span class="wizard-summary-value highlight-success">${formatPHP(r.effectiveMonthlySavings)}</span>
                 </div>
                 <div class="wizard-summary-item">
                     <span class="wizard-summary-label">Payback</span>
@@ -1840,6 +1931,9 @@ document.addEventListener('DOMContentLoaded', () => {
         updateBatteryOptions();
         closeWizard();
         calculate();
+        // Land the user on their results instead of dumping them at the top of the page.
+        const roiSection = document.querySelector('.roi-section');
+        if (roiSection) setTimeout(() => roiSection.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
     }
 
     // Wizard event listeners
@@ -2276,11 +2370,9 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('.wizard-option').forEach(btn => btn.addEventListener('click', dismissSampleHint));
     }
 
-    // First visit (no saved/shared config and wizard not previously dismissed):
-    // lead with the Quick Setup Wizard. Fully dismissible.
-    if (isSampleScenario && !localStorage.getItem('wizardDismissed')) {
-        setTimeout(() => openWizard(), 400);
-    }
+    // First visit: the pre-filled sample results render immediately so the visitor sees value
+    // in the first few seconds. The Quick Setup Wizard is an explicit opt-in (the hero button)
+    // rather than an interruption that fires before any number is on screen.
 
     // Shared link: restore inputs AND land the user on the results/analysis view.
     if (loadedFromURL) {

@@ -13,6 +13,10 @@
 
 const GEMINI_MODEL = 'gemini-2.0-flash';
 const MAX_FILES = 12;
+const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif', 'application/pdf'];
+const RATE_LIMIT = 12;         // max requests per IP...
+const RATE_WINDOW_MS = 60000;  // ...per minute (best-effort; only shared within a warm instance)
+const rateHits = new Map();
 
 const RESPONSE_SCHEMA = {
     type: 'object',
@@ -68,6 +72,29 @@ module.exports = async function handler(req, res) {
         return;
     }
 
+    // Only accept calls from our own site (or Vercel preview deploys) to protect the paid key.
+    const reqHost = String(req.headers.host || '').toLowerCase();
+    const originHeader = req.headers.origin || req.headers.referer || '';
+    if (originHeader) {
+        try {
+            const originHost = new URL(originHeader).host.toLowerCase();
+            const allowed = originHost === reqHost || originHost.endsWith('.vercel.app') ||
+                (process.env.ALLOWED_ORIGIN && originHost === process.env.ALLOWED_ORIGIN.toLowerCase());
+            if (!allowed) { res.status(403).json({ ok: false, error: 'Forbidden.' }); return; }
+        } catch (e) { /* malformed Origin header — fall through */ }
+    }
+
+    // Best-effort per-IP rate limit (shared only within a warm serverless instance).
+    const ip = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown';
+    const nowTs = Date.now();
+    const recentHits = (rateHits.get(ip) || []).filter(t => nowTs - t < RATE_WINDOW_MS);
+    if (recentHits.length >= RATE_LIMIT) {
+        res.status(429).json({ ok: false, error: 'Too many requests. Please wait a minute and try again.' });
+        return;
+    }
+    recentHits.push(nowTs);
+    rateHits.set(ip, recentHits);
+
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
         res.status(503).json({ ok: false, error: 'AI bill reading is not configured on the server. Please enter your bill details manually.' });
@@ -93,6 +120,10 @@ module.exports = async function handler(req, res) {
     for (const f of files) {
         if (!f || !f.data || !f.mimeType) {
             res.status(400).json({ ok: false, error: 'One of the uploaded files was invalid.' });
+            return;
+        }
+        if (!ALLOWED_MIME.includes(String(f.mimeType).toLowerCase())) {
+            res.status(400).json({ ok: false, error: 'Unsupported file type. Please upload a JPG, PNG, or PDF.' });
             return;
         }
         parts.push({ inlineData: { mimeType: f.mimeType, data: f.data } });
