@@ -16,10 +16,11 @@
 window.KINMO_EQUIPMENT = {
     disclaimer: 'Indicative — final design upon site assessment.',
 
-    // DYNESS 314Ah LiFePO4 module: 51.2V x 314Ah ≈ 16.08 kWh usable-nominal per unit.
+    // LiFePO4 storage module: 51.2V x 314Ah ≈ 16.08 kWh usable-nominal per unit.
+    // (Brand intentionally generic for now — set `brand` when a battery partner is confirmed.)
     battery: {
-        brand: 'DYNESS',
-        model: '314Ah (51.2V) LiFePO4',
+        brand: 'LiFePO4',
+        model: '314Ah (51.2V) module',
         unitKwh: 16.08
     },
 

@@ -1188,7 +1188,6 @@ document.addEventListener('DOMContentLoaded', () => {
         doc.text('What You Get With Kinmo PW', left, y); y += 17;
         doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); txt([60, 72, 92]);
         ['GoodWe — Tier-1 hybrid inverters',
-         'DYNESS — LiFePO4 battery storage',
          "Backed by Kinmo PW's own power-quality brands: Northstar, UNI-T, YIY"
         ].forEach(t => { doc.text('—   ' + t, left + 4, y); y += 15; });
         y += 4;
