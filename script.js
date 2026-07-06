@@ -1096,118 +1096,208 @@ document.addEventListener('DOMContentLoaded', () => {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF({ unit: 'pt', format: 'a4' });
         const res = window.solarCalcResults || {};
-        const nameEl = document.getElementById('customerName');
-        const locEl = document.getElementById('customerLocation');
-        const custName = (nameEl && nameEl.value) ? nameEl.value : '';
-        const custLoc = (locEl && locEl.value) ? locEl.value : '';
+        const num = (v, d = 0) => (typeof v === 'number' && isFinite(v)) ? v : d;
+        const custName = ((document.getElementById('customerName') || {}).value || '').trim() || 'Valued Customer';
+        const custLoc = ((document.getElementById('customerLocation') || {}).value || '').trim() || '—';
         const dateStr = new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
-        // jsPDF's built-in fonts have no peso glyph, so use a "PHP" prefix in the PDF only.
         const peso = v => 'PHP ' + Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         const pesoShort = v => { v = Number(v || 0); return v >= 1e6 ? 'PHP ' + (v / 1e6).toFixed(2) + 'M' : v >= 1e3 ? 'PHP ' + (v / 1e3).toFixed(0) + 'K' : 'PHP ' + v.toFixed(0); };
-
-        const pageW = doc.internal.pageSize.getWidth();
-        const left = 48, right = pageW - 48, contentW = right - left;
-
-        // Palette
-        const ink = [15, 23, 42], muted = [100, 116, 139], blue = [37, 99, 235],
-            green = [16, 133, 96], amber = [193, 120, 10], lightBg = [244, 247, 250], rule = [226, 232, 240];
-        const txt = c => doc.setTextColor(c[0], c[1], c[2]);
-        const fill = c => doc.setFillColor(c[0], c[1], c[2]);
-
-        // ---- Header: logo + report title ----
         const logo = await loadLogo();
-        if (logo && logo.dataUrl) {
-            const h = 40, w = Math.min(170, h * logo.ratio);
-            try { doc.addImage(logo.dataUrl, 'PNG', left, 34, w, h); } catch (e) { /* skip logo */ }
-        } else {
-            doc.setFont('helvetica', 'bold'); doc.setFontSize(18); txt(ink);
-            doc.text('Kinmo PW', left, 60);
-        }
-        doc.setFont('helvetica', 'bold'); doc.setFontSize(13); txt(ink);
-        doc.text('SOLAR FEASIBILITY REPORT', right, 46, { align: 'right' });
-        doc.setFont('helvetica', 'normal'); doc.setFontSize(9); txt(muted);
-        doc.text('Kinmo PW Corporation', right, 62, { align: 'right' });
-        doc.text(dateStr, right, 75, { align: 'right' });
 
-        fill(blue); doc.rect(left, 92, contentW, 3, 'F');
-        let y = 122;
 
-        // ---- Prepared for ----
-        if (custName) {
-            doc.setFont('helvetica', 'bold'); doc.setFontSize(8); txt(muted);
-            doc.text('PREPARED FOR', left, y);
-            doc.setFont('helvetica', 'bold'); doc.setFontSize(13); txt(ink);
-            doc.text(custName + (custLoc ? '   ·   ' + custLoc : ''), left, y + 16);
-            y += 42;
-        }
+        const NAVY=[15,23,42], NAVY2=[30,41,59], BLUE=[37,99,235], GREEN=[22,163,74], EMER=[16,185,129],
+          AMBER=[245,158,11], AMBER2=[251,191,36], SLATE=[71,85,105], SLATE2=[100,116,139],
+          LSLATE=[148,163,184], WHITE=[255,255,255], PAPER=[247,249,252], LINE=[226,232,240], CARD=[255,255,255], SKY=[219,234,254];
+        const W=595, H=842, M=40;
+        const sf=c=>doc.setFillColor(c[0],c[1],c[2]);
+        const sd=c=>doc.setDrawColor(c[0],c[1],c[2]);
+        const st=c=>doc.setTextColor(c[0],c[1],c[2]);
+        const F=(s,w='normal')=>doc.setFont('helvetica',w).setFontSize(s);
+        const txt=(s,x,y,o={})=>{ if(o.font)doc.setFont('helvetica',o.font); if(o.size)doc.setFontSize(o.size); if(o.color)st(o.color); doc.text(String(s),x,y,{align:o.align||'left',baseline:o.baseline||'alphabetic'}); };
 
-        // ---- Headline metric cards ----
-        const cards = [
-            { label: 'EST. SYSTEM COST', value: pesoShort(res.estimatedSystemCost), color: ink },
-            { label: 'PAYBACK PERIOD', value: res.paybackYears ? res.paybackYears.toFixed(1) + ' yrs' : 'N/A', color: amber },
-            { label: '25-YEAR ROI', value: res.roi ? res.roi.toFixed(0) + '%' : 'N/A', color: green }
+        sf(PAPER); doc.rect(0,0,W,H,'F');
+
+        const HH=100;
+        sf(NAVY); doc.rect(0,0,W,HH,'F');
+        sf(NAVY2); doc.triangle(W-150,0,W,0,W,HH,'F');
+        sf(BLUE); doc.triangle(W-60,0,W,0,W,60,'F');
+        sf(AMBER); doc.rect(0,HH,W,3,'F');
+        const lc=HH/2, lx=M+22;
+        sf(WHITE); doc.circle(lx,lc,24,'F');
+        if(logo&&logo.dataUrl){ try{ doc.addImage(logo.dataUrl,'PNG',lx-20,lc-20,40,40); }catch(e){} }
+        txt('Solar Feasibility Report', lx+40, lc-8, {font:'bold', size:21, color:WHITE, baseline:'middle'});
+        txt('KINMO PW CORPORATION', lx+40, lc+13, {font:'bold', size:9, color:[147,197,253], baseline:'middle'});
+        txt('Solar EPC — Design, Supply & Install', lx+40, lc+25, {font:'normal', size:8, color:LSLATE, baseline:'middle'});
+        txt(dateStr, W-M, lc-8, {font:'normal', size:9, color:[203,213,225], align:'right', baseline:'middle'});
+        txt('CONFIDENTIAL PROPOSAL', W-M, lc+10, {font:'bold', size:7.5, color:AMBER2, align:'right', baseline:'middle'});
+
+        let y=HH+3+18;
+        sf(WHITE); doc.roundedRect(M,y,W-2*M,34,5,5,'F');
+        sd(LINE); doc.setLineWidth(0.7); doc.roundedRect(M,y,W-2*M,34,5,5,'S');
+        sf(BLUE); doc.roundedRect(M,y,4,34,2,2,'F');
+        txt('PREPARED FOR', M+16, y+13, {font:'bold', size:7.5, color:SLATE2});
+        txt(custName, M+16, y+27, {font:'bold', size:12.5, color:NAVY});
+        txt('LOCATION', W-M-16, y+13, {font:'bold', size:7.5, color:SLATE2, align:'right'});
+        txt(custLoc, W-M-16, y+27, {font:'bold', size:12.5, color:NAVY, align:'right'});
+
+        y+=34+16;
+        const gap=12, cardW=(W-2*M-2*gap)/3, cardH=76;
+        const cards=[
+          {label:'ESTIMATED SYSTEM COST', val:pesoShort(res.estimatedSystemCost), sub:'Turnkey, installed', accent:BLUE, tint:SKY},
+          {label:'PAYBACK PERIOD', val:num(res.paybackYears)?num(res.paybackYears).toFixed(1)+' yrs':'N/A', sub:'Break-even point', accent:AMBER, tint:[254,243,199]},
+          {label:'25-YEAR ROI', val:num(res.roi)?num(res.roi).toFixed(0)+'%':'N/A', sub:'Return on investment', accent:GREEN, tint:[220,252,231]},
         ];
-        const gap = 12, cardW = (contentW - gap * 2) / 3, cardH = 66;
-        cards.forEach((c, i) => {
-            const x = left + i * (cardW + gap);
-            fill(lightBg); doc.roundedRect(x, y, cardW, cardH, 6, 6, 'F');
-            doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); txt(muted);
-            doc.text(c.label, x + 12, y + 20);
-            doc.setFont('helvetica', 'bold'); doc.setFontSize(16); txt(c.color);
-            doc.text(String(c.value), x + 12, y + 46);
+        cards.forEach((c,i)=>{
+          const x=M+i*(cardW+gap);
+          sf(CARD); doc.roundedRect(x,y,cardW,cardH,7,7,'F');
+          sd(LINE); doc.setLineWidth(0.7); doc.roundedRect(x,y,cardW,cardH,7,7,'S');
+          sf(c.accent); doc.roundedRect(x,y,cardW,5,7,7,'F'); sf(c.accent); doc.rect(x,y+3,cardW,3,'F');
+          sf(c.tint); doc.circle(x+16,y+26,7,'F');
+          sf(c.accent); doc.circle(x+16,y+26,3,'F');
+          txt(c.label, x+28, y+28, {font:'bold', size:7.5, color:SLATE2});
+          txt(c.val, x+14, y+52, {font:'bold', size:20, color:NAVY});
+          txt(c.sub, x+14, y+66, {font:'normal', size:7.5, color:LSLATE});
         });
-        y += cardH + 28;
 
-        // ---- System details table ----
-        doc.setFont('helvetica', 'bold'); doc.setFontSize(11); txt(ink);
-        doc.text('System Details', left, y); y += 16;
-        const rows = [
-            ['Project Type', (res.scale || '—') + ' / ' + (res.type || '—')],
-            ['System Capacity', (res.systemCapacity || 0).toFixed(2) + ' kWp'],
-            ['Number of Panels', String(res.numPanels || 0)],
-            ['Monthly Electricity Bill', peso(res.monthlyBill)],
-            ['Est. Monthly Savings', peso(res.monthlySavings)],
-            ['Est. Annual Savings', peso(res.annualSavings)],
-            ['Bill Offset', (res.billOffset || 0).toFixed(1) + '%'],
-            ['25-Year Net Savings', peso(res.lifetimeSavings)],
-            ['Battery Configuration', res.batteryConfig || 'None']
+        y+=cardH+16;
+        const colGap=14, leftW=308, rightW=W-2*M-leftW-colGap, leftX=M, rightX=M+leftW+colGap;
+        const bodyH=288;
+        sf(CARD); doc.roundedRect(leftX,y,leftW,bodyH,8,8,'F');
+        sd(LINE); doc.setLineWidth(0.7); doc.roundedRect(leftX,y,leftW,bodyH,8,8,'S');
+        txt('THE NUMBERS AT A GLANCE', leftX+16, y+22, {font:'bold', size:9.5, color:NAVY});
+        sd(LINE); doc.setLineWidth(0.7); doc.line(leftX+16,y+30,leftX+leftW-16,y+30);
+        let by=y+46;
+        txt('25-Year Net Savings  vs  System Cost', leftX+16, by, {font:'bold', size:8.5, color:SLATE});
+        by+=12;
+        const barX=leftX+120, barMaxW=leftW-16-(barX-leftX);
+        const maxVal=Math.max(num(res.lifetimeSavings), num(res.estimatedSystemCost), 1);
+        const bar=(rowY,label,val,color,valStr)=>{
+          txt(label, leftX+16, rowY+9, {font:'bold', size:8, color:SLATE2});
+          const bw=Math.max(6, barMaxW*(num(val)/maxVal));
+          sf([241,245,249]); doc.roundedRect(barX,rowY,barMaxW,13,3,3,'F');
+          sf(color); doc.roundedRect(barX,rowY,bw,13,3,3,'F');
+          const inside=bw>70;
+          txt(valStr, inside?barX+bw-6:barX+bw+5, rowY+9.3, {font:'bold', size:8, color:inside?WHITE:NAVY, align:inside?'right':'left'});
+        };
+        bar(by, '25-Yr Savings', res.lifetimeSavings, GREEN, pesoShort(res.lifetimeSavings)); by+=22;
+        bar(by, 'System Cost', res.estimatedSystemCost, BLUE, pesoShort(res.estimatedSystemCost)); by+=22;
+        txt('Net lifetime gain', leftX+16, by+9, {font:'normal', size:8, color:LSLATE});
+        txt('+ '+pesoShort(num(res.lifetimeSavings)-num(res.estimatedSystemCost)), barX, by+9, {font:'bold', size:8.5, color:GREEN});
+        by+=30;
+        sd(LINE); doc.setLineWidth(0.5); doc.line(leftX+16,by,leftX+leftW-16,by);
+        by+=18;
+        txt('MONTHLY BILL OFFSET', leftX+16, by, {font:'bold', size:8.5, color:SLATE});
+        const dcx=leftX+70, dcy=by+60, dR=42, dr=27;
+        const pct=Math.max(0,Math.min(1,num(res.billOffset)/100));
+        const ring=(cx,cy,R,r,startFrac,endFrac,color)=>{
+          sf(color);
+          const a0=-Math.PI/2 + startFrac*2*Math.PI, a1=-Math.PI/2 + endFrac*2*Math.PI;
+          const n=Math.max(2,Math.round(120*(endFrac-startFrac)));
+          for(let i=0;i<n;i++){
+            const t0=a0+(a1-a0)*(i/n), t1=a0+(a1-a0)*((i+1)/n);
+            const ox0=cx+R*Math.cos(t0),oy0=cy+R*Math.sin(t0),ox1=cx+R*Math.cos(t1),oy1=cy+R*Math.sin(t1);
+            const ix0=cx+r*Math.cos(t0),iy0=cy+r*Math.sin(t0),ix1=cx+r*Math.cos(t1),iy1=cy+r*Math.sin(t1);
+            doc.triangle(ox0,oy0,ox1,oy1,ix1,iy1,'F');
+            doc.triangle(ox0,oy0,ix1,iy1,ix0,iy0,'F');
+          }
+        };
+        ring(dcx,dcy,dR,dr,0,1,[226,232,240]);
+        if(pct>0) ring(dcx,dcy,dR,dr,0,pct,AMBER);
+        txt(num(res.billOffset).toFixed(0)+'%', dcx, dcy-2, {font:'bold', size:17, color:NAVY, align:'center', baseline:'middle'});
+        txt('offset', dcx, dcy+13, {font:'normal', size:7.5, color:SLATE2, align:'center', baseline:'middle'});
+        const lgx=dcx+dR+24; let lgy=by+28;
+        sf(AMBER); doc.roundedRect(lgx,lgy-7,10,10,2,2,'F');
+        txt('Covered by solar', lgx+16, lgy+1, {font:'bold', size:8, color:SLATE, baseline:'middle'});
+        txt(num(res.billOffset).toFixed(0)+'% of your bill', lgx+16, lgy+13, {font:'normal', size:7.5, color:LSLATE, baseline:'middle'});
+        lgy+=34;
+        sf([226,232,240]); doc.roundedRect(lgx,lgy-7,10,10,2,2,'F');
+        txt('From the grid', lgx+16, lgy+1, {font:'bold', size:8, color:SLATE, baseline:'middle'});
+        txt((100-num(res.billOffset)).toFixed(0)+'% remaining', lgx+16, lgy+13, {font:'normal', size:7.5, color:LSLATE, baseline:'middle'});
+        lgy+=34;
+        txt('Est. monthly savings', lgx+16, lgy+1, {font:'normal', size:7.5, color:SLATE2, baseline:'middle'});
+        txt(peso(res.monthlySavings).replace('.00',''), lgx+16, lgy+13, {font:'bold', size:9, color:GREEN, baseline:'middle'});
+
+        sf(CARD); doc.roundedRect(rightX,y,rightW,bodyH,8,8,'F');
+        sd(LINE); doc.setLineWidth(0.7); doc.roundedRect(rightX,y,rightW,bodyH,8,8,'S');
+        sf(NAVY); doc.roundedRect(rightX,y,rightW,26,8,8,'F'); sf(NAVY); doc.rect(rightX,y+13,rightW,13,'F');
+        txt('SYSTEM & FINANCIAL DETAILS', rightX+14, y+17, {font:'bold', size:9, color:WHITE});
+        const rows=[
+          ['Project Type', res.scale||'—'],
+          ['Configuration', res.type||'—'],
+          ['System Capacity', num(res.systemCapacity).toFixed(2)+' kWp'],
+          ['Number of Panels', String(num(res.numPanels))],
+          ['Battery Configuration', res.batteryConfig||'None'],
+          ['Monthly Electricity Bill', peso(res.monthlyBill).replace('.00','')],
+          ['Est. Monthly Savings', peso(res.monthlySavings).replace('.00','')],
+          ['Est. Annual Savings', peso(res.annualSavings).replace('.00','')],
+          ['Bill Offset', num(res.billOffset).toFixed(1)+'%'],
+          ['25-Year Net Savings', peso(res.lifetimeSavings).replace('.00','')],
         ];
-        doc.setFontSize(9.5);
-        rows.forEach((row, i) => {
-            if (i % 2 === 0) { fill(lightBg); doc.rect(left, y - 11, contentW, 20, 'F'); }
-            doc.setFont('helvetica', 'normal'); txt(muted);
-            doc.text(row[0], left + 8, y + 3);
-            doc.setFont('helvetica', 'bold'); txt(ink);
-            doc.text(String(row[1]), right - 8, y + 3, { align: 'right' });
-            y += 20;
+        const ry=y+26, rowH=(bodyH-26-8)/rows.length;
+        rows.forEach((r,i)=>{
+          const yy=ry+i*rowH;
+          if(i%2===1){ sf([248,250,252]); doc.rect(rightX+1,yy,rightW-2,rowH,'F'); }
+          txt(r[0], rightX+14, yy+rowH/2+0.5, {font:'normal', size:8.5, color:SLATE, baseline:'middle'});
+          const highlight=/Savings|Offset/.test(r[0]);
+          txt(r[1], rightX+rightW-14, yy+rowH/2+0.5, {font:'bold', size:9, color:highlight?GREEN:NAVY, align:'right', baseline:'middle'});
         });
-        y += 24;
+        sd(LINE); doc.setLineWidth(0.4);
+        rows.forEach((r,i)=>{ if(i>0){ const yy=ry+i*rowH; doc.line(rightX+10,yy,rightX+rightW-10,yy); }});
 
-        // ---- What you get with Kinmo (equipment + trust) ----
-        doc.setFont('helvetica', 'bold'); doc.setFontSize(11); txt(ink);
-        doc.text('What You Get With Kinmo PW', left, y); y += 17;
-        doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); txt([60, 72, 92]);
-        ['GoodWe — Tier-1 hybrid inverters',
-         "Backed by Kinmo PW's own power-quality brands: Northstar, UNI-T, YIY"
-        ].forEach(t => { doc.text('—   ' + t, left + 4, y); y += 15; });
-        y += 4;
-        doc.setFontSize(9); txt(muted);
-        ['Professional installation and on-site assessment',
-         'We file your net-metering application with your utility',
-         'Manufacturer-backed equipment warranties'
-        ].forEach(t => { doc.text('—   ' + t, left + 4, y); y += 14; });
+        y+=bodyH+14;
+        const wgH=108;
+        sf(CARD); doc.roundedRect(M,y,W-2*M,wgH,8,8,'F');
+        sd(LINE); doc.setLineWidth(0.7); doc.roundedRect(M,y,W-2*M,wgH,8,8,'S');
+        sf(GREEN); doc.roundedRect(M,y,4,wgH,2,2,'F');
+        txt('WHAT YOU GET WITH KINMO PW', M+16, y+20, {font:'bold', size:10, color:NAVY});
+        sd(LINE); doc.setLineWidth(0.6); doc.line(M+16,y+27,W-M-16,y+27);
+        const midX=M+(W-2*M)/2;
+        const chkline=(x,yy,bold,rest)=>{
+          sf([220,252,231]); doc.circle(x+4,yy-3,5.5,'F');
+          sd(GREEN); doc.setLineWidth(1.2);
+          doc.line(x+1.5,yy-3,x+3.2,yy-1.2); doc.line(x+3.2,yy-1.2,x+6.6,yy-5.4);
+          txt(bold, x+15, yy, {font:'bold', size:8.5, color:NAVY});
+          if(rest) txt(rest, x+15, yy+11, {font:'normal', size:8, color:SLATE2});
+        };
+        const ex=M+16, eyy=y+44;
+        chkline(ex,eyy,'GoodWe','Tier-1 hybrid inverters');
+        chkline(ex,eyy+34,'Kinmo PW power-quality brands','Northstar · UNI-T · YIY');
+        const tx=midX+6, tyy=y+44;
+        chkline(tx,tyy,'Professional installation','On-site assessment included');
+        chkline(tx,tyy+24,'Net-metering filing','We file with your utility');
+        chkline(tx,tyy+48,'Manufacturer warranties','On all supplied equipment');
+        sd(LINE); doc.setLineWidth(0.6); doc.line(midX-4,y+38,midX-4,y+wgH-12);
 
-        // ---- Disclaimer + contact ----
-        y += 12; doc.setDrawColor(rule[0], rule[1], rule[2]); doc.line(left, y, right, y); y += 16;
-        doc.setFont('helvetica', 'italic'); doc.setFontSize(7.5); txt([150, 158, 170]);
-        const disclaimer = 'Rough estimate only. Lifetime model assumes 0.4%/yr panel degradation, 4.5%/yr electricity rate inflation, annual O&M, and one inverter replacement at Year 12. Request a formal quotation for final ROI and hardware scope.';
-        doc.text(doc.splitTextToSize(disclaimer, contentW), left, y); y += 30;
+        y+=wgH+12;
+        const tlH=54;
+        sf(NAVY); doc.roundedRect(M,y,W-2*M,tlH,8,8,'F');
+        txt('PROJECTED CASH TIMELINE', M+16, y+17, {font:'bold', size:8.5, color:[147,197,253]});
+        const tlx=M+16, tlw=W-2*M-32, tly=y+36;
+        sf(NAVY2); doc.roundedRect(tlx,tly,tlw,6,3,3,'F');
+        const pf=Math.max(0,Math.min(1,num(res.paybackYears)/25));
+        sf(AMBER); doc.roundedRect(tlx,tly,tlw*pf,6,3,3,'F');
+        sf(EMER); doc.roundedRect(tlx+tlw*pf,tly,tlw*(1-pf),6,3,3,'F'); sf(EMER); doc.rect(tlx+tlw*pf,tly,3,6,'F');
+        const marker=(frac,col)=>{ const mx=tlx+tlw*frac; sf(WHITE); doc.circle(mx,tly+3,4,'F'); sf(col); doc.circle(mx,tly+3,2.4,'F'); };
+        marker(0,BLUE); marker(pf,AMBER); marker(1,EMER);
+        txt('Year 0 — Install', tlx, tly-8, {font:'bold', size:7.5, color:WHITE});
+        txt('Year '+num(res.paybackYears).toFixed(1)+' — Break-even', tlx+tlw*pf, tly-8, {font:'bold', size:7.5, color:AMBER2, align:'center'});
+        txt('Year 25 — '+pesoShort(res.lifetimeSavings), tlx+tlw, tly-8, {font:'bold', size:7.5, color:[110,231,183], align:'right'});
+        txt('Investment', tlx, tly+16, {font:'normal', size:7, color:LSLATE});
+        txt('Pure savings from here', tlx+tlw, tly+16, {font:'normal', size:7, color:LSLATE, align:'right'});
 
-        doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); txt(ink);
-        doc.text('Contact Kinmo PW', left, y); y += 14;
-        doc.setFont('helvetica', 'normal'); doc.setFontSize(9); txt(muted);
-        doc.text('Office: 09778407799  |  09167050208       Sales: 09687269310 (Earl Dy)', left, y); y += 13;
-        doc.text('earldy.kpwunibest@gmail.com', left, y);
+        y+=tlH+12;
+        const disc='Rough estimate only. Lifetime model assumes 0.4%/yr panel degradation, 4.5%/yr electricity rate inflation, annual O&M, and one inverter replacement at Year 12. Request a formal quotation for final ROI and hardware scope.';
+        F(7,'italic'); st(LSLATE);
+        const dl=doc.splitTextToSize(disc, W-2*M);
+        doc.setFont('helvetica','italic'); doc.text(dl, M, y);
+        y+= dl.length*8.5 + 8;
+        const cbH=34;
+        sf(NAVY); doc.roundedRect(M,y,W-2*M,cbH,6,6,'F');
+        sf(AMBER); doc.roundedRect(M,y,4,cbH,2,2,'F');
+        txt('Office: 09778407799 · 09167050208', M+16, y+13, {font:'bold', size:8, color:WHITE});
+        txt('Sales: 09687269310 (Earl Dy)', M+16, y+25, {font:'normal', size:8, color:[203,213,225]});
+        txt('earldy.kpwunibest@gmail.com', W-M-14, y+13, {font:'bold', size:8.5, color:AMBER2, align:'right'});
+        txt('Kinmo PW Corporation — Solar EPC', W-M-14, y+25, {font:'normal', size:7.5, color:LSLATE, align:'right'});
 
         doc.save('Kinmo-Solar-Report.pdf');
     }
