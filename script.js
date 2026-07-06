@@ -1068,7 +1068,27 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ==================== INSTANT PDF REPORT ====================
-    function generatePDF() {
+    // Load the Kinmo logo once as a PNG data URL (same-origin -> canvas not tainted).
+    let logoInfo = null;
+    function loadLogo() {
+        return new Promise((resolve) => {
+            if (logoInfo !== null) return resolve(logoInfo);
+            const img = new Image();
+            img.onload = () => {
+                try {
+                    const c = document.createElement('canvas');
+                    c.width = img.naturalWidth; c.height = img.naturalHeight;
+                    c.getContext('2d').drawImage(img, 0, 0);
+                    logoInfo = { dataUrl: c.toDataURL('image/png'), ratio: (img.naturalWidth / img.naturalHeight) || 1 };
+                } catch (e) { logoInfo = { dataUrl: null, ratio: 1 }; }
+                resolve(logoInfo);
+            };
+            img.onerror = () => { logoInfo = { dataUrl: null, ratio: 1 }; resolve(logoInfo); };
+            img.src = 'logo.png';
+        });
+    }
+
+    async function generatePDF() {
         if (!window.jspdf || !window.jspdf.jsPDF) {
             alert('The PDF generator is still loading — please try again in a moment.');
             return;
@@ -1077,69 +1097,127 @@ document.addEventListener('DOMContentLoaded', () => {
         const doc = new jsPDF({ unit: 'pt', format: 'a4' });
         const res = window.solarCalcResults || {};
         const nameEl = document.getElementById('customerName');
+        const locEl = document.getElementById('customerLocation');
         const custName = (nameEl && nameEl.value) ? nameEl.value : '';
+        const custLoc = (locEl && locEl.value) ? locEl.value : '';
         const dateStr = new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
+        // jsPDF's built-in fonts have no peso glyph, so use a "PHP" prefix in the PDF only.
+        const peso = v => 'PHP ' + Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const pesoShort = v => { v = Number(v || 0); return v >= 1e6 ? 'PHP ' + (v / 1e6).toFixed(2) + 'M' : v >= 1e3 ? 'PHP ' + (v / 1e3).toFixed(0) + 'K' : 'PHP ' + v.toFixed(0); };
 
         const pageW = doc.internal.pageSize.getWidth();
-        const left = 48;
-        let y = 56;
+        const left = 48, right = pageW - 48, contentW = right - left;
 
-        doc.setFont('helvetica', 'bold'); doc.setFontSize(18); doc.setTextColor(20, 30, 55);
-        doc.text('Kinmo PW Corporation', left, y);
-        doc.setFontSize(12); doc.setTextColor(90, 100, 120);
-        y += 20; doc.setFont('helvetica', 'normal');
-        doc.text('Solar Feasibility Report', left, y);
-        doc.setFontSize(9);
-        doc.text(dateStr, pageW - left, 56, { align: 'right' });
+        // Palette
+        const ink = [15, 23, 42], muted = [100, 116, 139], blue = [37, 99, 235],
+            green = [16, 133, 96], amber = [193, 120, 10], lightBg = [244, 247, 250], rule = [226, 232, 240];
+        const txt = c => doc.setTextColor(c[0], c[1], c[2]);
+        const fill = c => doc.setFillColor(c[0], c[1], c[2]);
 
-        y += 22; doc.setDrawColor(230); doc.line(left, y, pageW - left, y); y += 24;
+        // ---- Header: logo + report title ----
+        const logo = await loadLogo();
+        if (logo && logo.dataUrl) {
+            const h = 40, w = Math.min(170, h * logo.ratio);
+            try { doc.addImage(logo.dataUrl, 'PNG', left, 34, w, h); } catch (e) { /* skip logo */ }
+        } else {
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(18); txt(ink);
+            doc.text('Kinmo PW', left, 60);
+        }
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(13); txt(ink);
+        doc.text('SOLAR FEASIBILITY REPORT', right, 46, { align: 'right' });
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(9); txt(muted);
+        doc.text('Kinmo PW Corporation', right, 62, { align: 'right' });
+        doc.text(dateStr, right, 75, { align: 'right' });
 
+        fill(blue); doc.rect(left, 92, contentW, 3, 'F');
+        let y = 122;
+
+        // ---- Prepared for ----
         if (custName) {
-            doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(20, 30, 55);
-            doc.text('Prepared for: ' + custName, left, y); y += 22;
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(8); txt(muted);
+            doc.text('PREPARED FOR', left, y);
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(13); txt(ink);
+            doc.text(custName + (custLoc ? '   ·   ' + custLoc : ''), left, y + 16);
+            y += 42;
         }
 
+        // ---- Headline metric cards ----
+        const cards = [
+            { label: 'EST. SYSTEM COST', value: pesoShort(res.estimatedSystemCost), color: ink },
+            { label: 'PAYBACK PERIOD', value: res.paybackYears ? res.paybackYears.toFixed(1) + ' yrs' : 'N/A', color: amber },
+            { label: '25-YEAR ROI', value: res.roi ? res.roi.toFixed(0) + '%' : 'N/A', color: green }
+        ];
+        const gap = 12, cardW = (contentW - gap * 2) / 3, cardH = 66;
+        cards.forEach((c, i) => {
+            const x = left + i * (cardW + gap);
+            fill(lightBg); doc.roundedRect(x, y, cardW, cardH, 6, 6, 'F');
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); txt(muted);
+            doc.text(c.label, x + 12, y + 20);
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(16); txt(c.color);
+            doc.text(String(c.value), x + 12, y + 46);
+        });
+        y += cardH + 28;
+
+        // ---- System details table ----
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(11); txt(ink);
+        doc.text('System Details', left, y); y += 16;
         const rows = [
-            ['Project Scale', (res.scale || '—') + ' / ' + (res.type || '—')],
+            ['Project Type', (res.scale || '—') + ' / ' + (res.type || '—')],
             ['System Capacity', (res.systemCapacity || 0).toFixed(2) + ' kWp'],
             ['Number of Panels', String(res.numPanels || 0)],
-            ['Monthly Electricity Bill', formatPHP(res.monthlyBill || 0)],
-            ['Est. Monthly Savings', formatPHP(res.monthlySavings || 0)],
-            ['Est. Annual Savings', formatPHP(res.annualSavings || 0)],
+            ['Monthly Electricity Bill', peso(res.monthlyBill)],
+            ['Est. Monthly Savings', peso(res.monthlySavings)],
+            ['Est. Annual Savings', peso(res.annualSavings)],
             ['Bill Offset', (res.billOffset || 0).toFixed(1) + '%'],
-            ['Est. System Cost', formatPHP(res.estimatedSystemCost || 0)],
-            ['Payback Period', (res.paybackYears ? res.paybackYears.toFixed(1) + ' years' : 'N/A')],
-            ['25-Year ROI', (res.roi ? res.roi.toFixed(0) + '%' : 'N/A')],
-            ['25-Year Net Savings', formatPHP(res.lifetimeSavings || 0)],
+            ['25-Year Net Savings', peso(res.lifetimeSavings)],
             ['Battery Configuration', res.batteryConfig || 'None']
         ];
-
-        doc.setFontSize(10);
+        doc.setFontSize(9.5);
         rows.forEach((row, i) => {
-            if (i % 2 === 0) { doc.setFillColor(245, 247, 250); doc.rect(left, y - 12, pageW - left * 2, 20, 'F'); }
-            doc.setFont('helvetica', 'normal'); doc.setTextColor(90, 100, 120);
-            doc.text(row[0], left + 8, y + 2);
-            doc.setFont('helvetica', 'bold'); doc.setTextColor(20, 30, 55);
-            doc.text(String(row[1]), pageW - left - 8, y + 2, { align: 'right' });
-            y += 22;
+            if (i % 2 === 0) { fill(lightBg); doc.rect(left, y - 11, contentW, 20, 'F'); }
+            doc.setFont('helvetica', 'normal'); txt(muted);
+            doc.text(row[0], left + 8, y + 3);
+            doc.setFont('helvetica', 'bold'); txt(ink);
+            doc.text(String(row[1]), right - 8, y + 3, { align: 'right' });
+            y += 20;
         });
+        y += 24;
 
-        y += 12; doc.setDrawColor(230); doc.line(left, y, pageW - left, y); y += 20;
-        doc.setFont('helvetica', 'italic'); doc.setFontSize(8); doc.setTextColor(130, 140, 155);
-        const disclaimer = 'Rough estimate only. Lifetime model assumes 0.4%/yr panel degradation, 4.5%/yr rate inflation, annual O&M, and one inverter replacement at Year 12. Request a formal quotation for final ROI and hardware scope.';
-        doc.text(doc.splitTextToSize(disclaimer, pageW - left * 2), left, y); y += 44;
+        // ---- What you get with Kinmo (equipment + trust) ----
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(11); txt(ink);
+        doc.text('What You Get With Kinmo PW', left, y); y += 17;
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); txt([60, 72, 92]);
+        ['GoodWe — Tier-1 hybrid inverters',
+         'DYNESS — LiFePO4 battery storage',
+         "Backed by Kinmo PW's own power-quality brands: Northstar, UNI-T, YIY"
+        ].forEach(t => { doc.text('—   ' + t, left + 4, y); y += 15; });
+        y += 4;
+        doc.setFontSize(9); txt(muted);
+        ['Professional installation and on-site assessment',
+         'We file your net-metering application with your utility',
+         'Manufacturer-backed equipment warranties'
+        ].forEach(t => { doc.text('—   ' + t, left + 4, y); y += 14; });
 
-        doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(20, 30, 55);
-        doc.text('Contact Kinmo PW', left, y); y += 16;
-        doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(90, 100, 120);
-        doc.text('Office: 09778407799 | 09167050208    Sales: 09687269310 (Earl Dy)', left, y); y += 14;
+        // ---- Disclaimer + contact ----
+        y += 12; doc.setDrawColor(rule[0], rule[1], rule[2]); doc.line(left, y, right, y); y += 16;
+        doc.setFont('helvetica', 'italic'); doc.setFontSize(7.5); txt([150, 158, 170]);
+        const disclaimer = 'Rough estimate only. Lifetime model assumes 0.4%/yr panel degradation, 4.5%/yr electricity rate inflation, annual O&M, and one inverter replacement at Year 12. Request a formal quotation for final ROI and hardware scope.';
+        doc.text(doc.splitTextToSize(disclaimer, contentW), left, y); y += 30;
+
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); txt(ink);
+        doc.text('Contact Kinmo PW', left, y); y += 14;
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(9); txt(muted);
+        doc.text('Office: 09778407799  |  09167050208       Sales: 09687269310 (Earl Dy)', left, y); y += 13;
         doc.text('earldy.kpwunibest@gmail.com', left, y);
 
         doc.save('Kinmo-Solar-Report.pdf');
     }
 
     const btnDownloadPdf = document.getElementById('btnDownloadPdf');
-    if (btnDownloadPdf) btnDownloadPdf.addEventListener('click', generatePDF);
+    if (btnDownloadPdf) btnDownloadPdf.addEventListener('click', () => {
+        generatePDF().catch((e) => { console.error('PDF generation failed:', e); alert('Sorry, the PDF could not be generated. Please try again.'); });
+    });
+    loadLogo(); // warm the logo cache so the first download is instant
 
     // ==================== LOCAL STORAGE ====================
     function saveToLocalStorage() {
