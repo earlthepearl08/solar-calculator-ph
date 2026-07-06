@@ -11,7 +11,10 @@
 //   503 { ok:false, error }  -> API key not configured (client falls back to manual entry)
 //   4xx/5xx { ok:false, error } -> bad request / upstream failure
 
-const GEMINI_MODEL = 'gemini-2.0-flash';
+// Tried in order; falls through to the next only when a model is unavailable (404).
+// Normal case makes ONE call (the first that responds). Update/reorder as Google's
+// lineup changes.
+const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-flash-latest'];
 const MAX_FILES = 12;
 const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif', 'application/pdf'];
 const RATE_LIMIT = 12;         // max requests per IP...
@@ -129,7 +132,6 @@ module.exports = async function handler(req, res) {
         parts.push({ inlineData: { mimeType: f.mimeType, data: f.data } });
     }
 
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
     const payload = {
         contents: [{ role: 'user', parts }],
         generationConfig: {
@@ -140,28 +142,42 @@ module.exports = async function handler(req, res) {
     };
 
     try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 45000);
-        const gRes = await fetch(endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-            signal: controller.signal
-        });
-        clearTimeout(timeout);
+        let gRes = null;
+        let lastStatus = 0, lastDetail = '';
+        // Try each candidate model; only fall through to the next when THIS model is
+        // missing (404 / NOT_FOUND). Any other error stops and is returned as-is.
+        for (const model of GEMINI_MODELS) {
+            const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 45000);
+            let resp;
+            try {
+                resp = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                    signal: controller.signal
+                });
+            } finally {
+                clearTimeout(timeout);
+            }
+            if (resp.ok) { gRes = resp; break; }
+            lastStatus = resp.status;
+            lastDetail = await resp.text().catch(() => '');
+            console.error('Gemini error', model, resp.status, lastDetail.slice(0, 500));
+            const notFound = resp.status === 404 || /NOT_FOUND|not found/i.test(lastDetail);
+            if (!notFound) break;
+        }
 
-        if (!gRes.ok) {
-            const detail = await gRes.text().catch(() => '');
-            console.error('Gemini error', gRes.status, detail.slice(0, 800));
-            // Surface Google's own status/message (diagnostic, never contains the key).
+        if (!gRes) {
             let reason = '';
-            try { const j = JSON.parse(detail); reason = (j.error && (j.error.message || j.error.status)) || ''; } catch (e) { /* non-JSON body */ }
+            try { const j = JSON.parse(lastDetail); reason = (j.error && (j.error.message || j.error.status)) || ''; } catch (e) { /* non-JSON body */ }
             let hint;
-            if (gRes.status === 400) hint = 'The AI service rejected the request (400) — usually a bad/outdated model name or a malformed request.';
-            else if (gRes.status === 403) hint = 'The AI service rejected the API key (403) — the key is invalid/restricted, or the "Generative Language API" is not enabled for it. Use a key from aistudio.google.com/apikey with no HTTP-referrer restriction.';
-            else if (gRes.status === 404) hint = 'The AI model was not found (404) — the model "' + GEMINI_MODEL + '" may be unavailable for this API version. Try a current one such as gemini-2.5-flash or gemini-1.5-flash.';
-            else if (gRes.status === 429) hint = 'The AI service is rate-limited or out of quota (429) — wait a minute, or check your Google API quota/billing.';
-            else hint = 'The AI service returned an error (' + gRes.status + '). Please try again or enter details manually.';
+            if (lastStatus === 400) hint = 'The AI service rejected the request (400) — usually a malformed request or unsupported response schema.';
+            else if (lastStatus === 403) hint = 'The AI service rejected the API key (403) — the key is invalid/restricted, or the "Generative Language API" is not enabled for it. Use a key from aistudio.google.com/apikey with no HTTP-referrer restriction.';
+            else if (lastStatus === 404) hint = 'No available AI model was found (404). Tried: ' + GEMINI_MODELS.join(', ') + '.';
+            else if (lastStatus === 429) hint = 'The AI service is rate-limited or out of quota (429) — wait a minute, or check your Google API quota/billing.';
+            else hint = 'The AI service returned an error (' + lastStatus + '). Please try again or enter details manually.';
             res.status(502).json({ ok: false, error: hint + (reason ? ' [Google: ' + String(reason).slice(0, 160) + ']' : '') });
             return;
         }
