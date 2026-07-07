@@ -112,6 +112,17 @@ document.addEventListener('DOMContentLoaded', () => {
         return '₱' + val.toFixed(0);
     }
 
+    // Rounds to a clean band (low rounded down, high rounded up) so the figure
+    // reads as a rough estimate, not a quote. e.g. "₱1.55M – ₱1.80M"
+    function formatPHPRange(low, high) {
+        low = Number(low) || 0; high = Number(high) || 0;
+        const step = high < 1000000 ? 20000 : 50000;
+        const lo = Math.floor(low / step) * step;
+        let hi = Math.ceil(high / step) * step;
+        if (hi <= lo) hi = lo + step;
+        return formatPHPShort(lo) + ' – ' + formatPHPShort(hi);
+    }
+
     function clampInput(el) {
         const val = parseFloat(el.value);
         const min = parseFloat(el.min);
@@ -477,13 +488,23 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ==================== COST CALCULATION ====================
+    // Public-facing per-kWp price BAND (PHP). Low = competitive pricing for a
+    // straightforward install; High = site complexity (roof type, structural or
+    // electrical upgrades, longer cabling runs, permitting). Battery priced separately.
+    function getCostRangePerKwp(scale, capacityKwp) {
+        if (scale === 'Utility Scale') return { low: 29000, high: 38000 };
+        if (capacityKwp <= 20)  return { low: 42000, high: 54000 };
+        if (capacityKwp <= 50)  return { low: 35000, high: 46000 };
+        if (capacityKwp <= 100) return { low: 33000, high: 43000 };
+        if (capacityKwp <= 300) return { low: 32000, high: 42000 };
+        return { low: 29000, high: 38000 };
+    }
+
+    // Midpoint of the band — the single representative figure that drives
+    // payback / ROI / financing / chart math (which need one number, not a range).
     function getCostPerKwp(scale, capacityKwp) {
-        if (scale === 'Utility Scale') return 44000;
-        if (capacityKwp <= 20) return 60000;
-        if (capacityKwp <= 50) return 55000;
-        if (capacityKwp <= 100) return 50500;
-        if (capacityKwp <= 300) return 47000;
-        return 44000;
+        const r = getCostRangePerKwp(scale, capacityKwp);
+        return (r.low + r.high) / 2;
     }
 
     function getBatteryCostPerKwh(scale) {
@@ -627,6 +648,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const batteryCost = (type !== 'Grid-Tied' && batteryCapacityTotal > 0)
             ? batteryCapacityTotal * getBatteryCostPerKwh(scale) : 0;
         const estimatedSystemCost = solarCost + batteryCost;
+        // Public-facing cost BAND: vary the solar per-kWp rate across its tier;
+        // battery cost is fixed and added identically to both bounds.
+        const costRange = getCostRangePerKwp(scale, displayKwp);
+        const estimatedSystemCostLow = displayKwp * costRange.low + batteryCost;
+        const estimatedSystemCostHigh = displayKwp * costRange.high + batteryCost;
         const annualSavings = effectiveMonthlySavings * 12;
 
         // Realistic lifetime model: panel degradation, rate inflation, O&M, inverter replacement
@@ -660,7 +686,7 @@ document.addEventListener('DOMContentLoaded', () => {
             batteryCapacityTotal, numBatt, batteryUnitLabel, usableBatteryKwh, batteryShiftedKwh,
             c1Title, c1Desc, c1DailySavingsKwh, c1MonthlySavings, c1Offset, residualSurplusKwh,
             c2MonthlySavings, c2Offset, effectiveMonthlySavings, effectiveOffset,
-            solarCost, batteryCost, estimatedSystemCost, costPerKwp, paybackYears, roi, annualSavings, totalLifetimeSavings,
+            solarCost, batteryCost, estimatedSystemCost, estimatedSystemCostLow, estimatedSystemCostHigh, costPerKwp, paybackYears, roi, annualSavings, totalLifetimeSavings,
             yearlyCumulative, annualOM, inverterReplacementCost,
             batteryConfig, isSpaceLimited, numPanelsRequired, cappedPanelsPossible
         };
@@ -743,7 +769,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // ROI display
-        if (elements.resSystemCost) elements.resSystemCost.textContent = formatPHPShort(r.estimatedSystemCost);
+        if (elements.resSystemCost) elements.resSystemCost.textContent = formatPHPRange(r.estimatedSystemCostLow, r.estimatedSystemCostHigh);
         if (elements.resPayback) elements.resPayback.textContent = r.paybackYears > 0 ? r.paybackYears.toFixed(1) + " years" : "N/A";
         if (elements.resROI) elements.resROI.textContent = r.roi > 0 ? r.roi.toFixed(0) + "%" : "N/A";
 
@@ -796,6 +822,7 @@ document.addEventListener('DOMContentLoaded', () => {
             annualSavings: r.annualSavings,
             billOffset: Math.min(r.effectiveOffset, 100),
             estimatedSystemCost: r.estimatedSystemCost, costPerKwp: r.costPerKwp,
+            estimatedSystemCostLow: r.estimatedSystemCostLow, estimatedSystemCostHigh: r.estimatedSystemCostHigh,
             paybackYears: r.paybackYears, roi: r.roi,
             lifetimeSavings: r.totalLifetimeSavings,
             batteryConfig: r.batteryConfig
@@ -1102,6 +1129,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const dateStr = new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
         const peso = v => 'PHP ' + Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         const pesoShort = v => { v = Number(v || 0); return v >= 1e6 ? 'PHP ' + (v / 1e6).toFixed(2) + 'M' : v >= 1e3 ? 'PHP ' + (v / 1e3).toFixed(0) + 'K' : 'PHP ' + v.toFixed(0); };
+        const pesoRange = (lo, hi) => { const step = Number(hi||0) < 1e6 ? 20000 : 50000; let a = Math.floor((Number(lo)||0)/step)*step; let b = Math.ceil((Number(hi)||0)/step)*step; if (b <= a) b = a + step; if (a >= 1e6 && b >= 1e6) return 'PHP ' + (a/1e6).toFixed(2) + '–' + (b/1e6).toFixed(2) + 'M'; if (b < 1e6) return 'PHP ' + (a/1e3).toFixed(0) + '–' + (b/1e3).toFixed(0) + 'K'; return pesoShort(a) + ' – ' + pesoShort(b); };
         const logo = await loadLogo();
 
 
@@ -1142,7 +1170,7 @@ document.addEventListener('DOMContentLoaded', () => {
         y+=34+16;
         const gap=12, cardW=(W-2*M-2*gap)/3, cardH=76;
         const cards=[
-          {label:'ESTIMATED SYSTEM COST', val:pesoShort(res.estimatedSystemCost), sub:'Turnkey, installed', accent:BLUE, tint:SKY},
+          {label:'ESTIMATED SYSTEM COST', val:pesoRange(res.estimatedSystemCostLow, res.estimatedSystemCostHigh), sub:'Turnkey, installed (est. range)', accent:BLUE, tint:SKY},
           {label:'PAYBACK PERIOD', val:num(res.paybackYears)?num(res.paybackYears).toFixed(1)+' yrs':'N/A', sub:'Break-even point', accent:AMBER, tint:[254,243,199]},
           {label:'25-YEAR ROI', val:num(res.roi)?num(res.roi).toFixed(0)+'%':'N/A', sub:'Return on investment', accent:GREEN, tint:[220,252,231]},
         ];
@@ -1153,7 +1181,9 @@ document.addEventListener('DOMContentLoaded', () => {
           sf(c.tint); doc.circle(x+16,y+26,7,'F');
           sf(c.accent); doc.circle(x+16,y+26,3,'F');
           txt(c.label, x+28, y+28, {font:'bold', size:7.5, color:SLATE2});
-          txt(c.val, x+14, y+52, {font:'bold', size:20, color:NAVY});
+          let vfs=20; doc.setFont('helvetica','bold'); doc.setFontSize(vfs);
+          while (vfs>11 && doc.getTextWidth(String(c.val)) > cardW-26) { vfs-=0.5; doc.setFontSize(vfs); }
+          txt(c.val, x+14, y+52, {font:'bold', size:vfs, color:NAVY});
           txt(c.sub, x+14, y+66, {font:'normal', size:7.5, color:LSLATE});
         });
 
@@ -1736,7 +1766,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     monthly_savings: formatPHP(results.monthlySavings || 0),
                     annual_savings: formatPHP(results.annualSavings || 0),
                     bill_offset: (results.billOffset || 0).toFixed(1) + '%',
-                    system_cost: formatPHP(results.estimatedSystemCost || 0),
+                    system_cost: formatPHPRange(results.estimatedSystemCostLow || 0, results.estimatedSystemCostHigh || 0),
                     payback_years: (results.paybackYears || 0).toFixed(1),
                     roi: (results.roi || 0).toFixed(0) + '%',
                     battery_config: results.batteryConfig || 'None'
@@ -2026,7 +2056,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <div class="wizard-summary-item">
                     <span class="wizard-summary-label">Est. Cost</span>
-                    <span class="wizard-summary-value">${formatPHPShort(r.estimatedSystemCost)}</span>
+                    <span class="wizard-summary-value">${formatPHPRange(r.estimatedSystemCostLow, r.estimatedSystemCostHigh)}</span>
                 </div>
                 <div class="wizard-summary-item">
                     <span class="wizard-summary-label">Monthly Savings</span>
