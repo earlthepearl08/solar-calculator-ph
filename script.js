@@ -1107,7 +1107,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const NAVY=[15,23,42], NAVY2=[30,41,59], BLUE=[37,99,235], GREEN=[22,163,74], EMER=[16,185,129],
           AMBER=[245,158,11], AMBER2=[251,191,36], SLATE=[71,85,105], SLATE2=[100,116,139],
-          LSLATE=[148,163,184], WHITE=[255,255,255], PAPER=[247,249,252], LINE=[226,232,240], CARD=[255,255,255], SKY=[219,234,254];
+          LSLATE=[148,163,184], WHITE=[255,255,255], PAPER=[240,243,247], LINE=[226,232,240], CARD=[255,255,255], SKY=[219,234,254];
         const W=595, H=842, M=40;
         const sf=c=>doc.setFillColor(c[0],c[1],c[2]);
         const sd=c=>doc.setDrawColor(c[0],c[1],c[2]);
@@ -1133,7 +1133,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let y=HH+3+18;
         sf(WHITE); doc.roundedRect(M,y,W-2*M,34,5,5,'F');
-        sd(LINE); doc.setLineWidth(0.7); doc.roundedRect(M,y,W-2*M,34,5,5,'S');
         sf(BLUE); doc.roundedRect(M,y,4,34,2,2,'F');
         txt('PREPARED FOR', M+16, y+13, {font:'bold', size:7.5, color:SLATE2});
         txt(custName, M+16, y+27, {font:'bold', size:12.5, color:NAVY});
@@ -1150,7 +1149,6 @@ document.addEventListener('DOMContentLoaded', () => {
         cards.forEach((c,i)=>{
           const x=M+i*(cardW+gap);
           sf(CARD); doc.roundedRect(x,y,cardW,cardH,7,7,'F');
-          sd(LINE); doc.setLineWidth(0.7); doc.roundedRect(x,y,cardW,cardH,7,7,'S');
           sf(c.accent); doc.roundedRect(x,y,cardW,5,7,7,'F'); sf(c.accent); doc.rect(x,y+3,cardW,3,'F');
           sf(c.tint); doc.circle(x+16,y+26,7,'F');
           sf(c.accent); doc.circle(x+16,y+26,3,'F');
@@ -1163,7 +1161,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const colGap=14, leftW=308, rightW=W-2*M-leftW-colGap, leftX=M, rightX=M+leftW+colGap;
         const bodyH=288;
         sf(CARD); doc.roundedRect(leftX,y,leftW,bodyH,8,8,'F');
-        sd(LINE); doc.setLineWidth(0.7); doc.roundedRect(leftX,y,leftW,bodyH,8,8,'S');
         txt('THE NUMBERS AT A GLANCE', leftX+16, y+22, {font:'bold', size:9.5, color:NAVY});
         sd(LINE); doc.setLineWidth(0.7); doc.line(leftX+16,y+30,leftX+leftW-16,y+30);
         let by=y+46;
@@ -1174,7 +1171,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const bar=(rowY,label,val,color,valStr)=>{
           txt(label, leftX+16, rowY+9, {font:'bold', size:8, color:SLATE2});
           const bw=Math.max(6, barMaxW*(num(val)/maxVal));
-          sf([241,245,249]); doc.roundedRect(barX,rowY,barMaxW,13,3,3,'F');
+          sf([236,240,245]); doc.roundedRect(barX,rowY,barMaxW,13,3,3,'F');
           sf(color); doc.roundedRect(barX,rowY,bw,13,3,3,'F');
           const inside=bw>70;
           txt(valStr, inside?barX+bw-6:barX+bw+5, rowY+9.3, {font:'bold', size:8, color:inside?WHITE:NAVY, align:inside?'right':'left'});
@@ -1218,7 +1215,6 @@ document.addEventListener('DOMContentLoaded', () => {
         txt(peso(res.monthlySavings).replace('.00',''), lgx+16, lgy+13, {font:'bold', size:9, color:GREEN, baseline:'middle'});
 
         sf(CARD); doc.roundedRect(rightX,y,rightW,bodyH,8,8,'F');
-        sd(LINE); doc.setLineWidth(0.7); doc.roundedRect(rightX,y,rightW,bodyH,8,8,'S');
         sf(NAVY); doc.roundedRect(rightX,y,rightW,26,8,8,'F'); sf(NAVY); doc.rect(rightX,y+13,rightW,13,'F');
         txt('SYSTEM & FINANCIAL DETAILS', rightX+14, y+17, {font:'bold', size:9, color:WHITE});
         const rows=[
@@ -1226,8 +1222,8 @@ document.addEventListener('DOMContentLoaded', () => {
           ['Configuration', res.type||'—'],
           ['System Capacity', num(res.systemCapacity).toFixed(2)+' kWp'],
           ['Number of Panels', String(num(res.numPanels))],
-          ['Battery Configuration', res.batteryConfig||'None'],
-          ['Monthly Electricity Bill', peso(res.monthlyBill).replace('.00','')],
+          ['Battery', res.batteryConfig||'None'],
+          ['Monthly Bill', peso(res.monthlyBill).replace('.00','')],
           ['Est. Monthly Savings', peso(res.monthlySavings).replace('.00','')],
           ['Est. Annual Savings', peso(res.annualSavings).replace('.00','')],
           ['Bill Offset', num(res.billOffset).toFixed(1)+'%'],
@@ -1236,18 +1232,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const ry=y+26, rowH=(bodyH-26-8)/rows.length;
         rows.forEach((r,i)=>{
           const yy=ry+i*rowH;
-          if(i%2===1){ sf([248,250,252]); doc.rect(rightX+1,yy,rightW-2,rowH,'F'); }
+          if(i%2===1){ sf([245,247,250]); doc.rect(rightX+1,yy,rightW-2,rowH,'F'); }
+          doc.setFont('helvetica','normal'); doc.setFontSize(8.5); const lw=doc.getTextWidth(String(r[0]));
           txt(r[0], rightX+14, yy+rowH/2+0.5, {font:'normal', size:8.5, color:SLATE, baseline:'middle'});
           const highlight=/Savings|Offset/.test(r[0]);
-          txt(r[1], rightX+rightW-14, yy+rowH/2+0.5, {font:'bold', size:9, color:highlight?GREEN:NAVY, align:'right', baseline:'middle'});
+          let vfs=9; doc.setFont('helvetica','bold'); doc.setFontSize(vfs);
+          const avail=rightW-28-lw-10;
+          while(vfs>6.5 && doc.getTextWidth(String(r[1]))>avail){ vfs-=0.5; doc.setFontSize(vfs); }
+          txt(r[1], rightX+rightW-14, yy+rowH/2+0.5, {font:'bold', size:vfs, color:highlight?GREEN:NAVY, align:'right', baseline:'middle'});
         });
-        sd(LINE); doc.setLineWidth(0.4);
-        rows.forEach((r,i)=>{ if(i>0){ const yy=ry+i*rowH; doc.line(rightX+10,yy,rightX+rightW-10,yy); }});
 
         y+=bodyH+14;
         const wgH=108;
         sf(CARD); doc.roundedRect(M,y,W-2*M,wgH,8,8,'F');
-        sd(LINE); doc.setLineWidth(0.7); doc.roundedRect(M,y,W-2*M,wgH,8,8,'S');
         sf(GREEN); doc.roundedRect(M,y,4,wgH,2,2,'F');
         txt('WHAT YOU GET WITH KINMO PW', M+16, y+20, {font:'bold', size:10, color:NAVY});
         sd(LINE); doc.setLineWidth(0.6); doc.line(M+16,y+27,W-M-16,y+27);
@@ -1280,10 +1277,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const marker=(frac,col)=>{ const mx=tlx+tlw*frac; sf(WHITE); doc.circle(mx,tly+3,4,'F'); sf(col); doc.circle(mx,tly+3,2.4,'F'); };
         marker(0,BLUE); marker(pf,AMBER); marker(1,EMER);
         txt('Year 0 — Install', tlx, tly-8, {font:'bold', size:7.5, color:WHITE});
-        txt('Year '+num(res.paybackYears).toFixed(1)+' — Break-even', tlx+tlw*pf, tly-8, {font:'bold', size:7.5, color:AMBER2, align:'center'});
         txt('Year 25 — '+pesoShort(res.lifetimeSavings), tlx+tlw, tly-8, {font:'bold', size:7.5, color:[110,231,183], align:'right'});
-        txt('Investment', tlx, tly+16, {font:'normal', size:7, color:LSLATE});
-        txt('Pure savings from here', tlx+tlw, tly+16, {font:'normal', size:7, color:LSLATE, align:'right'});
+        const beX=Math.max(tlx+52, Math.min(tlx+tlw-52, tlx+tlw*pf));
+        txt('Break-even · Year '+num(res.paybackYears).toFixed(1), beX, tly+16, {font:'bold', size:7.5, color:AMBER2, align:'center'});
 
         y+=tlH+12;
         const disc='Rough estimate only. Lifetime model assumes 0.4%/yr panel degradation, 4.5%/yr electricity rate inflation, annual O&M, and one inverter replacement at Year 12. Request a formal quotation for final ROI and hardware scope.';
