@@ -113,13 +113,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Rounds to a clean band (low rounded down, high rounded up) so the figure
-    // reads as a rough estimate, not a quote. e.g. "₱1.55M – ₱1.80M"
+    // reads as a rough estimate, not a quote. Compact shared-suffix form keeps it
+    // on one line: "₱300–420K", "₱1.55–1.85M", "₱12.90–16.25M".
     function formatPHPRange(low, high) {
         low = Number(low) || 0; high = Number(high) || 0;
         const step = high < 1000000 ? 20000 : 50000;
         const lo = Math.floor(low / step) * step;
         let hi = Math.ceil(high / step) * step;
         if (hi <= lo) hi = lo + step;
+        if (lo >= 1e6 && hi >= 1e6) return '₱' + (lo / 1e6).toFixed(2) + '–' + (hi / 1e6).toFixed(2) + 'M';
+        if (hi < 1e6) return '₱' + (lo / 1e3).toFixed(0) + '–' + (hi / 1e3).toFixed(0) + 'K';
         return formatPHPShort(lo) + ' – ' + formatPHPShort(hi);
     }
 

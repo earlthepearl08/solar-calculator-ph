@@ -1473,6 +1473,18 @@ body {
     grid-template-columns: repeat(3, 1fr) !important;
 }
 
+/* On phones the cost value is a RANGE and needs room: give it the full width on
+   top, with Payback + ROI sharing a 2-col row below. Placed after the base
+   .roi-grid rule above so source order lets this win at <=640px. */
+@media (max-width: 640px) {
+    .roi-grid {
+        grid-template-columns: 1fr 1fr !important;
+    }
+    .roi-grid .roi-card:first-child {
+        grid-column: 1 / -1;
+    }
+}
+
 .roi-card {
     border-top-color: var(--success) !important;
 }
