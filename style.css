@@ -1283,6 +1283,32 @@ body {
     .wizard-summary-grid {
         grid-template-columns: 1fr;
     }
+
+    /* --- larger touch targets on phones --- */
+    .tooltip-icon { width: 24px; height: 24px; font-size: 0.72rem; }
+    .sidebar input[type="range"] { height: 12px; }
+    .sidebar input[type="range"]::-webkit-slider-thumb { width: 28px; height: 28px; }
+    .sidebar input[type="range"]::-moz-range-thumb { width: 28px; height: 28px; }
+    .checkbox-group { padding: 0.9rem; }
+    .checkbox-group input[type="checkbox"] { width: 24px; height: 24px; }
+    .contact-info a { display: inline-block; padding: 0.3rem 0; }
+
+    /* --- comparison table: fit more columns + hint horizontal scroll --- */
+    .comparison-table { font-size: 0.72rem; }
+    .comparison-table th,
+    .comparison-table td { padding: 0.55rem 0.5rem; }
+    .comparison-table-wrapper::after {
+        content: '';
+        position: absolute;
+        top: 1px; right: 1px; bottom: 1px;
+        width: 26px;
+        background: linear-gradient(to right, rgba(15, 23, 42, 0), rgba(15, 23, 42, 0.92));
+        border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+        pointer-events: none;
+    }
+    .sensitivity-table { font-size: 0.72rem; }
+    .sensitivity-table th,
+    .sensitivity-table td { padding: 0.4rem 0.35rem; }
 }
 
 /* ==================== REDUCED MOTION ==================== */
@@ -1995,6 +2021,7 @@ body {
 }
 
 .comparison-table-wrapper {
+    position: relative;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     border-radius: var(--radius-lg);
