@@ -495,12 +495,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // straightforward install; High = site complexity (roof type, structural or
     // electrical upgrades, longer cabling runs, permitting). Battery priced separately.
     function getCostRangePerKwp(scale, capacityKwp) {
-        if (scale === 'Utility Scale') return { low: 29000, high: 38000 };
+        if (scale === 'Utility Scale') return { low: 29500, high: 33500 };
         if (capacityKwp <= 20)  return { low: 42000, high: 54000 };
-        if (capacityKwp <= 50)  return { low: 35000, high: 46000 };
-        if (capacityKwp <= 100) return { low: 33000, high: 43000 };
-        if (capacityKwp <= 300) return { low: 32000, high: 42000 };
-        return { low: 29000, high: 38000 };
+        if (capacityKwp <= 50)  return { low: 37000, high: 42000 };
+        if (capacityKwp <= 100) return { low: 34500, high: 38000 };
+        if (capacityKwp <= 300) return { low: 32500, high: 37000 };
+        return { low: 29500, high: 33500 };
     }
 
     // Midpoint of the band — the single representative figure that drives
@@ -516,11 +516,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function getOMRatePerYear(scale) {
-        // Annual operations & maintenance as fraction of system cost
-        // Residential assumes owner-maintained (occasional cleaning only)
-        if (scale === 'Residential') return 0.003; // 0.3%/yr
-        if (scale === 'C&I') return 0.006; // 0.6%/yr (professional cleaning contract)
-        return 0.009; // Utility Scale 0.9%/yr
+        // Annual operations & maintenance as fraction of contract price (1.5–2.0%/yr):
+        // cleaning, monitoring, minor part replacement, and periodic inspection.
+        if (scale === 'Residential') return 0.015; // 1.5%/yr
+        if (scale === 'C&I') return 0.0175; // 1.75%/yr
+        return 0.02; // Utility Scale 2.0%/yr
     }
 
     // ==================== BATTERY LOGIC ====================
@@ -1173,7 +1173,7 @@ document.addEventListener('DOMContentLoaded', () => {
         y+=34+16;
         const gap=12, cardW=(W-2*M-2*gap)/3, cardH=76;
         const cards=[
-          {label:'ESTIMATED SYSTEM COST', val:pesoRange(res.estimatedSystemCostLow, res.estimatedSystemCostHigh), sub:'Turnkey, installed (est. range)', accent:BLUE, tint:SKY},
+          {label:'ESTIMATED SYSTEM COST', val:pesoRange(res.estimatedSystemCostLow, res.estimatedSystemCostHigh), sub:'VAT-exclusive · turnkey install', accent:BLUE, tint:SKY},
           {label:'PAYBACK PERIOD', val:num(res.paybackYears)?num(res.paybackYears).toFixed(1)+' yrs':'N/A', sub:'Break-even point', accent:AMBER, tint:[254,243,199]},
           {label:'25-YEAR ROI', val:num(res.roi)?num(res.roi).toFixed(0)+'%':'N/A', sub:'Return on investment', accent:GREEN, tint:[220,252,231]},
         ];
@@ -1315,7 +1315,7 @@ document.addEventListener('DOMContentLoaded', () => {
         txt('Break-even · Year '+num(res.paybackYears).toFixed(1), beX, tly+16, {font:'bold', size:7.5, color:AMBER2, align:'center'});
 
         y+=tlH+12;
-        const disc='Rough estimate only. Lifetime model assumes 0.4%/yr panel degradation, 4.5%/yr electricity rate inflation, annual O&M, and one inverter replacement at Year 12. Request a formal quotation for final ROI and hardware scope.';
+        const disc='All prices are VAT-exclusive. Rough estimate only. Lifetime model assumes 0.4%/yr panel degradation, 4.5%/yr electricity rate inflation, annual O&M (1.5–2.0% of contract price), and one inverter replacement at Year 12. Request a formal quotation for final ROI and hardware scope.';
         F(7,'italic'); st(LSLATE);
         const dl=doc.splitTextToSize(disc, W-2*M);
         doc.setFont('helvetica','italic'); doc.text(dl, M, y);

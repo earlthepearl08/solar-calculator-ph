@@ -1507,6 +1507,15 @@ body {
     letter-spacing: 0.02em;
 }
 
+.metric-note {
+    display: block;
+    margin-top: 0.4rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    letter-spacing: 0.02em;
+}
+
 .roi-disclaimer {
     font-size: 0.75rem;
     color: var(--text-muted);
