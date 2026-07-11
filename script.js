@@ -1136,9 +1136,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const logo = await loadLogo();
 
 
-        const NAVY=[15,23,42], NAVY2=[30,41,59], BLUE=[37,99,235], GREEN=[22,163,74], EMER=[16,185,129],
-          AMBER=[245,158,11], AMBER2=[251,191,36], SLATE=[71,85,105], SLATE2=[100,116,139],
-          LSLATE=[148,163,184], WHITE=[255,255,255], PAPER=[240,243,247], LINE=[226,232,240], CARD=[255,255,255], SKY=[219,234,254];
+        const NAVY=[16,26,44], NAVY2=[26,37,55], BLUE=[63,116,179], GREEN=[47,158,112], EMER=[46,150,108],
+          AMBER=[224,149,15], AMBER2=[222,168,74], SLATE=[71,85,105], SLATE2=[100,116,139],
+          LSLATE=[148,163,184], WHITE=[255,255,255], PAPER=[240,243,247], LINE=[226,232,240], CARD=[255,255,255], SKY=[224,231,241];
         const W=595, H=842, M=40;
         const sf=c=>doc.setFillColor(c[0],c[1],c[2]);
         const sd=c=>doc.setDrawColor(c[0],c[1],c[2]);
