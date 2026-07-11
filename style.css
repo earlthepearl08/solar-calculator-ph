@@ -1795,6 +1795,23 @@ body {
 
 .modal-overlay.active {
     display: flex;
+    animation: modal-overlay-in 0.22s ease-out;
+}
+
+/* Ease the panel in instead of snapping it on screen (the "pops up too fast" feel). */
+.modal-overlay.active .modal-content,
+.modal-overlay.active .wizard-content {
+    animation: modal-panel-in 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes modal-overlay-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes modal-panel-in {
+    from { opacity: 0; transform: translateY(14px) scale(0.985); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .modal-content {
@@ -2285,6 +2302,12 @@ body {
 
 .wizard-step.active {
     display: block;
+    animation: wizard-step-in 0.26s ease-out;
+}
+
+@keyframes wizard-step-in {
+    from { opacity: 0; transform: translateX(12px); }
+    to { opacity: 1; transform: translateX(0); }
 }
 
 .wizard-step h4 {

@@ -2159,11 +2159,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 wizardState[field] = value;
                 btn.closest('.wizard-options').querySelectorAll('.wizard-option').forEach(b => b.classList.remove('selected'));
                 btn.classList.add('selected');
-                // Auto-advance after selection
+                // Auto-advance after selection — long enough to see the choice highlight
+                // register before the step slides, so it doesn't feel like it "pops".
                 setTimeout(() => {
                     readWizardInputs();
                     if (wizCurrentStep < WIZ_TOTAL_STEPS) goToWizStep(wizCurrentStep + 1);
-                }, 300);
+                }, 450);
             }
         });
     });
