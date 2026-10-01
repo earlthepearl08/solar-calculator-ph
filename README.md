@@ -33,7 +33,8 @@ python3 -m http.server 8000
 ```
 
 Note: the `/api/extract-bill` endpoint only runs under `vercel dev` or on a Vercel deployment,
-and only when `GEMINI_API_KEY` is set.
+and only when `GEMINI_API_KEY` is set. Without the key the UI shows a friendly manual-entry
+fallback (503). After adding the env var in Vercel, redeploy so the function picks it up.
 
 ## Editing hardware recommendations
 
