@@ -4,14 +4,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Solar Feasibility & Requirement Tool | Kinmo PW</title>
+    <title>Free Solar Savings Calculator Philippines | Kinmo PW</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <meta name="description"
-        content="Rapid assessment of your solar energy potential, calculating required capacity and estimated bill offsets.">
+        content="Free solar savings calculator for homes in the Philippines. See system size, payback, and 25-year ROI — then book a free site assessment with Kinmo PW.">
+    <meta property="og:title" content="Free Solar Savings Calculator | Kinmo PW">
+    <meta property="og:description" content="See your solar savings in seconds. Free estimate for Philippine homes — then book a free site assessment with Kinmo PW (Earl Dy).">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="logo.png">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Free Solar Savings Calculator | Kinmo PW">
+    <meta name="twitter:description" content="See your solar savings in seconds — then book a free site assessment with Kinmo PW.">
 </head>
 
 <body>
@@ -32,16 +39,20 @@
             </div>
 
             <div class="sidebar-content">
-                <div class="input-group">
+                <div class="input-group" id="projectScaleGroup">
                     <label for="projectScale">
                         Project Scale
                         <span class="tooltip-icon" tabindex="0" role="button" aria-label="Choose the category that best fits your energy needs" data-tooltip="Choose the category that best fits your energy needs">ⓘ</span>
                     </label>
                     <select id="projectScale" aria-label="Project scale category">
                         <option value="Residential">Residential (up to 20kWp)</option>
-                        <option value="C&I">C&I (21-300kWp)</option>
-                        <option value="Utility Scale">Utility Scale (>300kWp)</option>
+                        <option value="C&I" class="scale-business-only">C&I (21-300kWp)</option>
+                        <option value="Utility Scale" class="scale-business-only">Utility Scale (>300kWp)</option>
                     </select>
+                    <div class="checkbox-group mode-toggle-row">
+                        <input type="checkbox" id="businessMode" aria-label="Show commercial and utility project options">
+                        <label for="businessMode">I'm a business / power user</label>
+                    </div>
                 </div>
 
                 <div class="input-group">
@@ -118,6 +129,16 @@
                     <small class="help-text" id="recommendedArea"></small>
                 </div>
 
+                <div class="input-group" id="usagePatternGroup">
+                    <label>When do you use most electricity?</label>
+                    <div class="usage-pattern-selector" role="radiogroup" aria-label="Residential electricity usage pattern">
+                        <button type="button" class="usage-pattern-option" data-daytime="70" aria-pressed="false">Mostly day</button>
+                        <button type="button" class="usage-pattern-option selected" data-daytime="40" aria-pressed="true">Mixed</button>
+                        <button type="button" class="usage-pattern-option" data-daytime="25" aria-pressed="false">Mostly night</button>
+                    </div>
+                    <small class="help-text">Affects how much solar offsets your bill directly.</small>
+                </div>
+
                 <div class="input-group hidden" id="daytimeLoadGroup">
                     <label for="daytimeLoad">Daytime Load Split <input type="number" id="daytimeLoadVal" class="inline-range-input" value="40" min="0" max="100" step="1" aria-label="Daytime load split value">%</label>
                     <input type="range" id="daytimeLoad" min="0" max="100" value="40" aria-label="Percentage of electricity used during daytime" aria-valuemin="0" aria-valuemax="100" aria-valuenow="40">
@@ -183,7 +204,7 @@
                             <input type="number" id="wattage" value="620" step="10" min="100" aria-label="Solar panel wattage in watts peak">
                         </div>
                         <div class="info-panel panel-size">
-                            <p>Panel Size: <strong>3.0 sqm</strong></p>
+                            <p>Panel footprint: <strong>2.1 sqm</strong> each</p>
                             <small>Includes spacing and mounting constraints.</small>
                         </div>
                     </div>
@@ -200,14 +221,15 @@
         <!-- Main Content -->
         <main class="main-content" role="main">
             <header class="main-header">
-                <h1>Kinmo PW Solar Feasibility Tool</h1>
+                <h1>Kinmo PW</h1>
+                <p class="brand-subhead">Free Solar Savings Calculator</p>
                 <div class="project-tag" id="displayProjectScale">Residential Project</div>
             </header>
 
             <div class="intro-box">
-                <p class="intro-lead">See your 25-year solar savings in seconds.</p>
-                <button class="btn-wizard" id="btnWizard" aria-label="Open quick setup wizard">Quick Setup Wizard</button>
-                <p class="sample-hint hidden" id="sampleHint">Sample scenario — enter your own details to see your numbers.</p>
+                <p class="intro-lead">See your 25-year solar savings in seconds — then book a free site assessment.</p>
+                <button class="btn-wizard" id="btnWizard" aria-label="Open quick setup wizard">Quick Setup (3 steps)</button>
+                <p class="sample-hint hidden" id="sampleHint"><strong>Sample scenario shown</strong> — upload your bill or enter your own details for real numbers.</p>
             </div>
 
             <div id="statusAlerts" aria-live="polite" role="status"></div>
@@ -263,9 +285,31 @@
                 </details>
 
                 <p class="roi-disclaimer">* All prices shown are <strong>VAT-exclusive</strong>. Lifetime model assumes 0.4%/yr panel degradation (premium Tier 1), 4.5%/yr electricity rate inflation (Meralco historical CAGR), annual O&amp;M (1.5–2.0% of contract price depending on scale), and one inverter replacement at Year 12 (~10% of solar cost). Rough estimate only — request a formal quotation for final ROI and hardware scope.</p>
-                <div class="roi-chat-cta">
-                    <span>Questions about your numbers?</span>
-                    <a class="btn-cta btn-messenger" data-chat="messenger" href="https://www.facebook.com/messages/t/kinmopwcorporation" target="_blank" rel="noopener noreferrer">Chat with our team</a>
+                <details class="assumptions-panel" id="assumptionsPanel">
+                    <summary>Assumptions &amp; methodology</summary>
+                    <div class="assumptions-content" id="assumptionsContent">
+                        <ul>
+                            <li><strong>Peak sun hours (PSH):</strong> regional annual averages (e.g. Metro Manila 4.3) — not seasonal.</li>
+                            <li><strong>System efficiency:</strong> 80% derate covering inverter, soiling, wiring, and mismatch (no site-specific tilt/shade model).</li>
+                            <li><strong>Panel footprint:</strong> 2.1 m² per module including spacing.</li>
+                            <li><strong>Billing days:</strong> 30 days/month for kWh conversion.</li>
+                            <li><strong>Battery DoD:</strong> 90% usable capacity; Hybrid/Off-Grid only.</li>
+                            <li><strong>Costs:</strong> VAT-exclusive turnkey bands by kWp tier; ROI math uses band midpoint.</li>
+                            <li><strong>Net metering:</strong> surplus credited at generation charge; monthly savings capped at your bill for this estimate.</li>
+                        </ul>
+                        <p class="assumptions-note">This tool is a free promotional estimate — not an engineering design. A Kinmo PW site assessment confirms roof condition, shade, electrical capacity, and final quotation.</p>
+                    </div>
+                </details>
+                <div class="roi-primary-cta" id="roiPrimaryCta">
+                    <div class="roi-primary-copy">
+                        <strong>Like these numbers?</strong>
+                        <span>Book a free site assessment with Earl Dy — we reply within 1 business day.</span>
+                    </div>
+                    <div class="roi-primary-actions">
+                        <button type="button" class="btn-report btn-book-assessment" id="btnBookAssessment">Book a free site assessment</button>
+                        <a class="btn-cta btn-messenger" data-chat="messenger" href="https://www.facebook.com/messages/t/kinmopwcorporation" target="_blank" rel="noopener noreferrer">Messenger</a>
+                        <a class="btn-cta btn-whatsapp" data-chat="whatsapp" href="https://wa.me/639687269310" target="_blank" rel="noopener noreferrer">WhatsApp</a>
+                    </div>
                 </div>
             </section>
 
@@ -367,8 +411,8 @@
                 </div>
             </section>
 
-            <!-- Power-user: Comparison + Sensitivity combined into one collapsible -->
-            <details class="advanced-analysis" id="advancedAnalysis">
+            <!-- Power-user: Comparison + Sensitivity (shown when business mode is on) -->
+            <details class="advanced-analysis power-user-only hidden" id="advancedAnalysis">
                 <summary>Compare scenarios & what-if analysis</summary>
                 <section class="comparison-section" id="comparisonSection">
                     <h3>System Type Comparison</h3>
@@ -418,14 +462,113 @@
                 </div>
             </section>
 
+            <!-- Process strip -->
+            <section class="process-section" id="processSection">
+                <h3>How it works with Kinmo</h3>
+                <p class="section-subtitle">From this free estimate to power on your roof.</p>
+                <ol class="process-steps">
+                    <li><strong>Assess</strong><span>Share your bill &amp; site details</span></li>
+                    <li><strong>Design</strong><span>Site visit &amp; formal quotation</span></li>
+                    <li><strong>Install</strong><span>Professional turnkey installation</span></li>
+                    <li><strong>Net-metering</strong><span>We file with your utility</span></li>
+                    <li><strong>Support</strong><span>Nationwide aftercare</span></li>
+                </ol>
+            </section>
+
+            <!-- Educational: Things to know -->
+            <section class="edu-section" id="thingsToKnow">
+                <h3>Things to know about solar in the Philippines</h3>
+                <div class="edu-grid">
+                    <article class="edu-card">
+                        <h4>Daytime first</h4>
+                        <p>Solar offsets daytime use first. Surplus needs net metering or a battery — otherwise it goes unused.</p>
+                    </article>
+                    <article class="edu-card">
+                        <h4>Shade &amp; cleaning</h4>
+                        <p>Dirty panels and shade can cut output. Tree management and periodic cleaning matter for real-world results.</p>
+                    </article>
+                    <article class="edu-card">
+                        <h4>Slow decline, one inverter swap</h4>
+                        <p>Panels typically lose ~0.4%/yr. This estimate assumes one inverter replacement around year 12.</p>
+                    </article>
+                    <article class="edu-card">
+                        <h4>Rates tend to rise</h4>
+                        <p>We model 4.5%/yr electricity inflation (Meralco historical CAGR). Your own generation can hedge bill growth.</p>
+                    </article>
+                    <article class="edu-card">
+                        <h4>Estimate ≠ quote</h4>
+                        <p>Permits, structure, and interconnection are why a free calculator is not a final quotation — a site assessment locks the design.</p>
+                    </article>
+                    <article class="edu-card">
+                        <h4>We help nationwide</h4>
+                        <p>Kinmo PW installs and can support net-metering filing across Luzon, Visayas, and Mindanao.</p>
+                    </article>
+                </div>
+            </section>
+
+            <!-- FAQ -->
+            <section class="faq-section" id="faqSection">
+                <h3>Frequently asked questions</h3>
+                <div class="faq-list">
+                    <details class="faq-item">
+                        <summary>How accurate is this calculator?</summary>
+                        <p>It is a transparent promotional estimate using regional peak sun hours, your bill/rate, and published assumptions. Roof shade, tilt, and electrical upgrades need a site assessment for a formal quotation.</p>
+                    </details>
+                    <details class="faq-item">
+                        <summary>What are peak sun hours and why does my region matter?</summary>
+                        <p>Peak sun hours (PSH) approximate average daily solar resource. Cordillera is lower than Metro Manila or Visayas in our table — that changes recommended system size and payback.</p>
+                    </details>
+                    <details class="faq-item">
+                        <summary>Grid-Tied vs Hybrid vs Off-Grid — which should I choose?</summary>
+                        <p>Grid-Tied is usually lowest cost if your utility is reliable. Hybrid adds battery backup for outages. Off-Grid is for sites without dependable grid — it needs more PV and storage.</p>
+                    </details>
+                    <details class="faq-item">
+                        <summary>What is net metering with Meralco or my co-op?</summary>
+                        <p>Net metering credits surplus solar exported to the grid, typically near the generation charge — lower than your full retail rate. Rules vary by utility; Kinmo can help with filing.</p>
+                    </details>
+                    <details class="faq-item">
+                        <summary>Why is generation charge lower than my retail rate?</summary>
+                        <p>Your bill includes distribution, taxes, and other charges. Export credits usually track generation charge only, so self-consumption is more valuable than export.</p>
+                    </details>
+                    <details class="faq-item">
+                        <summary>How much roof space do I need?</summary>
+                        <p>This tool uses about 2.1 m² per panel including spacing. A typical home system may need tens of square meters of unshaded roof — we confirm usable area on site.</p>
+                    </details>
+                    <details class="faq-item">
+                        <summary>Do I need a battery if the grid is stable?</summary>
+                        <p>Not required for savings. Batteries help with outages and capturing surplus when net metering is limited. Many homes start Grid-Tied and add storage later.</p>
+                    </details>
+                    <details class="faq-item">
+                        <summary>What's included in the estimated system cost?</summary>
+                        <p>VAT-exclusive turnkey bands (modules, inverter, mounting, typical install). Site complexity, VAT, and extras are confirmed in a formal quote.</p>
+                    </details>
+                    <details class="faq-item">
+                        <summary>Who files for net metering — Kinmo or me?</summary>
+                        <p>Kinmo PW can handle the net-metering application with your utility as part of our installation service.</p>
+                    </details>
+                    <details class="faq-item">
+                        <summary>What happens after I request a report or chat?</summary>
+                        <p>You get a PDF summary (when email works) and our sales team — Earl Dy — aims to reply within 1 business day to schedule a free site assessment.</p>
+                    </details>
+                    <details class="faq-item">
+                        <summary>Is my bill photo stored?</summary>
+                        <p>Photos are processed only to read amount and usage and are not stored by this app. You can always enter bill details manually instead.</p>
+                    </details>
+                </div>
+            </section>
+
             <!-- Get Custom Report CTA -->
             <section class="report-cta-section">
                 <div class="report-cta-box">
-                    <h3>Get Your Custom Solar Report</h3>
-                    <p>Receive a professional PDF summary of your solar feasibility analysis, including detailed ROI projections and system specifications.</p>
+                    <h3>Book a free site assessment</h3>
+                    <p>Get a PDF of this estimate and request a callback from Earl. Prefer chat? Use Messenger or WhatsApp — we reply within 1 business day.</p>
                     <button class="btn-report" id="btnGetReport">
-                        Get Your Custom Report
+                        Send my report &amp; request a callback
                     </button>
+                    <div class="report-cta-alt">
+                        <a class="btn-cta btn-messenger" data-chat="messenger" href="https://www.facebook.com/messages/t/kinmopwcorporation" target="_blank" rel="noopener noreferrer">Messenger</a>
+                        <a class="btn-cta btn-whatsapp" data-chat="whatsapp" href="https://wa.me/639687269310" target="_blank" rel="noopener noreferrer">WhatsApp</a>
+                    </div>
                 </div>
             </section>
 
@@ -460,8 +603,8 @@
     <div class="modal-overlay" id="reportModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
         <div class="modal-content">
             <button class="modal-close" id="modalClose" aria-label="Close modal">&times;</button>
-            <h3 id="modalTitle">Get Your Custom Solar Report</h3>
-            <p>Enter your details below and we'll send you a professional PDF summary of your solar feasibility analysis.</p>
+            <h3 id="modalTitle">Book a free site assessment</h3>
+            <p>Leave your details — we'll email a PDF of this estimate and call you back. Prefer chat? Use Messenger or WhatsApp after submitting.</p>
             <form id="reportForm">
                 <!-- Honeypot field - hidden from real users -->
                 <div class="sr-only" aria-hidden="true">
@@ -484,92 +627,85 @@
                     <label for="customerLocation">Location / City</label>
                     <input type="text" id="customerLocation" name="customerLocation" placeholder="Manila, Philippines">
                 </div>
+                <div class="form-group">
+                    <label for="customerTimeframe">When are you looking to install?</label>
+                    <select id="customerTimeframe" name="customerTimeframe" aria-label="Installation timeframe">
+                        <option value="">Select timeframe</option>
+                        <option value="ASAP / within 1 month">ASAP / within 1 month</option>
+                        <option value="1–3 months">1–3 months</option>
+                        <option value="3–6 months">3–6 months</option>
+                        <option value="Just researching">Just researching</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="customerBudget">Budget band (optional)</label>
+                    <select id="customerBudget" name="customerBudget" aria-label="Budget band">
+                        <option value="">Select budget band</option>
+                        <option value="Under ₱200K">Under ₱200K</option>
+                        <option value="₱200K–₱500K">₱200K–₱500K</option>
+                        <option value="₱500K–₱1M">₱500K–₱1M</option>
+                        <option value="Over ₱1M">Over ₱1M</option>
+                        <option value="Prefer not to say">Prefer not to say</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="customerChannel">Preferred contact channel</label>
+                    <select id="customerChannel" name="customerChannel" aria-label="Preferred contact channel">
+                        <option value="Any">Any</option>
+                        <option value="Phone call">Phone call</option>
+                        <option value="Messenger">Messenger</option>
+                        <option value="WhatsApp">WhatsApp</option>
+                        <option value="Viber">Viber</option>
+                        <option value="Email">Email</option>
+                    </select>
+                </div>
                 <div class="form-actions">
                     <button type="submit" class="btn-submit" id="btnSubmitReport">
-                        <span id="btnSubmitText">Send My Report</span>
-                        <span id="btnSubmitLoading" class="hidden">Generating...</span>
+                        <span id="btnSubmitText">Send my report &amp; request a callback</span>
+                        <span id="btnSubmitLoading" class="hidden">Sending...</span>
                     </button>
                 </div>
-                <p class="form-disclaimer">By submitting, you agree to be contacted by Kinmo PW regarding your solar inquiry.</p>
+                <p class="form-disclaimer">By submitting, you agree to be contacted by Kinmo PW regarding your solar inquiry. Leads may also be kept in your browser if email fails.</p>
             </form>
             <div id="reportSuccess" class="hidden">
                 <div class="success-icon"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div>
-                <h4>Report Sent Successfully!</h4>
-                <p>Check your email for your custom solar feasibility report. Our team may also reach out to discuss your project.</p>
+                <h4>You're on the list — thank you!</h4>
+                <p>Check your email for the PDF estimate. <strong>Earl Dy</strong> aims to reply within <strong>1 business day</strong> to schedule your free site assessment.</p>
                 <button class="btn-report" id="btnDownloadPdf">Download PDF now</button>
                 <div class="success-chat">
-                    <p>Prefer to talk to our team now?</p>
+                    <p>Want to talk now? Message sales with your estimate prefilled:</p>
                     <div class="success-chat-links">
                         <a class="btn-cta btn-messenger" data-chat="messenger" href="https://www.facebook.com/messages/t/kinmopwcorporation" target="_blank" rel="noopener noreferrer">Messenger</a>
                         <a class="btn-cta btn-whatsapp" data-chat="whatsapp" href="https://wa.me/639687269310" target="_blank" rel="noopener noreferrer">WhatsApp</a>
+                        <a class="btn-cta btn-viber" href="viber://chat?number=%2B639687269310" target="_blank" rel="noopener noreferrer">Viber</a>
                     </div>
+                    <p class="success-sla">Sales: 09687269310 (Earl Dy)</p>
                 </div>
                 <button class="btn-close-modal" id="btnCloseSuccess">Close</button>
             </div>
         </div>
     </div>
 
-    <!-- Setup Wizard Modal -->
+    <!-- Setup Wizard Modal — residential 3-step -->
     <div class="modal-overlay wizard-overlay" id="wizardModal" role="dialog" aria-modal="true" aria-labelledby="wizardTitle">
         <div class="wizard-content">
             <button class="modal-close wizard-close" id="wizardClose" aria-label="Close wizard">&times;</button>
-            <h3 id="wizardTitle">Quick Setup Wizard</h3>
+            <h3 id="wizardTitle">Quick Setup</h3>
+            <p class="wizard-lead">Three steps for a home estimate. Business / C&amp;I options are in the sidebar.</p>
 
-            <div class="wizard-progress" role="progressbar" aria-valuemin="1" aria-valuemax="5" aria-valuenow="1">
+            <div class="wizard-progress" role="progressbar" aria-valuemin="1" aria-valuemax="3" aria-valuenow="1">
                 <div class="wizard-progress-bar" id="wizardProgressBar"></div>
                 <div class="wizard-steps-indicator">
                     <span class="wizard-dot active" data-step="1">1</span>
                     <span class="wizard-dot" data-step="2">2</span>
                     <span class="wizard-dot" data-step="3">3</span>
-                    <span class="wizard-dot" data-step="4">4</span>
-                    <span class="wizard-dot" data-step="5">5</span>
                 </div>
             </div>
 
-            <!-- Step 1: Project Scale -->
+            <!-- Step 1: Electricity -->
             <div class="wizard-step active" id="wizStep1" role="group" aria-labelledby="wizStep1Title">
-                <h4 id="wizStep1Title">What type of project is this?</h4>
-                <p>Select the scale that best matches your energy needs.</p>
-                <div class="wizard-options">
-                    <button class="wizard-option selected" data-field="projectScale" data-value="Residential">
-                        <strong>Residential</strong>
-                        <small>Up to 20kWp — homes and small buildings</small>
-                    </button>
-                    <button class="wizard-option" data-field="projectScale" data-value="C&I">
-                        <strong>Commercial & Industrial</strong>
-                        <small>21-300kWp — offices, factories, warehouses</small>
-                    </button>
-                    <button class="wizard-option" data-field="projectScale" data-value="Utility Scale">
-                        <strong>Utility Scale</strong>
-                        <small>>300kWp — large-scale solar farms</small>
-                    </button>
-                </div>
-            </div>
-
-            <!-- Step 2: System Type -->
-            <div class="wizard-step" id="wizStep2" role="group" aria-labelledby="wizStep2Title">
-                <h4 id="wizStep2Title">Choose your system type</h4>
-                <p>How do you want your solar system configured?</p>
-                <div class="wizard-options">
-                    <button class="wizard-option selected" data-field="systemType" data-value="Grid-Tied">
-                        <strong>Grid-Tied</strong>
-                        <small>Connected to utility grid, lowest cost, no battery needed</small>
-                    </button>
-                    <button class="wizard-option" data-field="systemType" data-value="Hybrid">
-                        <strong>Hybrid</strong>
-                        <small>Grid + Battery backup for power outages</small>
-                    </button>
-                    <button class="wizard-option" data-field="systemType" data-value="Off-Grid">
-                        <strong>Off-Grid</strong>
-                        <small>Fully independent, requires battery storage</small>
-                    </button>
-                </div>
-            </div>
-
-            <!-- Step 3: Financial -->
-            <div class="wizard-step" id="wizStep3" role="group" aria-labelledby="wizStep3Title">
-                <h4 id="wizStep3Title">Your electricity details</h4>
-                <p>Enter your current electricity bill and rate.</p>
+                <h4 id="wizStep1Title">Your electricity bill</h4>
+                <p>Enter your bill details — or upload a photo. Sample numbers are prefilled until you change them.</p>
                 <div class="wizard-inputs">
                     <div class="wizard-input-group">
                         <label for="wizBill">Monthly Bill (PHP)</label>
@@ -594,12 +730,27 @@
                 </div>
                 <div class="wizard-upload-divider"><span>or</span></div>
                 <button type="button" class="btn-upload-bill wizard-upload-btn" id="btnUploadBillWizard" aria-label="Upload a photo of your electricity bill">Upload your bill instead</button>
+                <p class="wizard-system-label">System type</p>
+                <div class="wizard-options wizard-options-compact">
+                    <button type="button" class="wizard-option selected" data-field="systemType" data-value="Grid-Tied">
+                        <strong>Grid-Tied</strong>
+                        <small>Lowest cost</small>
+                    </button>
+                    <button type="button" class="wizard-option" data-field="systemType" data-value="Hybrid">
+                        <strong>Hybrid</strong>
+                        <small>With battery backup</small>
+                    </button>
+                    <button type="button" class="wizard-option" data-field="systemType" data-value="Off-Grid">
+                        <strong>Off-Grid</strong>
+                        <small>No utility</small>
+                    </button>
+                </div>
             </div>
 
-            <!-- Step 4: Physical -->
-            <div class="wizard-step" id="wizStep4" role="group" aria-labelledby="wizStep4Title">
-                <h4 id="wizStep4Title">Physical constraints</h4>
-                <p>Tell us about your available roof or land area.</p>
+            <!-- Step 2: Roof / area -->
+            <div class="wizard-step" id="wizStep2" role="group" aria-labelledby="wizStep2Title">
+                <h4 id="wizStep2Title">Your roof or site</h4>
+                <p>Pick a typical home type or enter your available area.</p>
                 <div class="wizard-inputs">
                     <div class="wizard-input-group">
                         <label for="wizRoofType">Roof / Site Type</label>
@@ -619,17 +770,20 @@
                 </div>
             </div>
 
-            <!-- Step 5: Summary -->
-            <div class="wizard-step" id="wizStep5" role="group" aria-labelledby="wizStep5Title">
-                <h4 id="wizStep5Title">Your Configuration Summary</h4>
+            <!-- Step 3: Summary -->
+            <div class="wizard-step" id="wizStep3" role="group" aria-labelledby="wizStep3Title">
+                <h4 id="wizStep3Title">Your estimate</h4>
                 <div class="wizard-summary" id="wizardSummary"></div>
+                <div class="wizard-finish-actions">
+                    <button type="button" class="btn-report btn-book-assessment" id="wizBookAssessment">Talk to sales now</button>
+                </div>
             </div>
 
             <!-- Navigation -->
             <div class="wizard-nav">
                 <button class="wizard-btn wizard-prev" id="wizPrev" disabled>Previous</button>
                 <button class="wizard-btn wizard-next" id="wizNext">Next</button>
-                <button class="wizard-btn wizard-finish hidden" id="wizFinish">View Full Analysis</button>
+                <button class="wizard-btn wizard-finish hidden" id="wizFinish">View full analysis</button>
             </div>
         </div>
     </div>
@@ -639,7 +793,7 @@
         <div class="modal-content bill-modal-content">
             <button class="modal-close" id="billModalClose" aria-label="Close bill upload">&times;</button>
             <h3 id="billModalTitle">Upload your electricity bill</h3>
-            <p>Upload 1–12 photos or PDFs of your Meralco or co-op bills — we'll read the amount and usage for you.</p>
+            <p>Upload 1–12 photos or PDFs of your Meralco or co-op bills — we'll read the amount and usage for you. If reading isn't available, you can enter bill and rate manually in the calculator.</p>
 
             <!-- Choose files -->
             <div id="billUploadStep">
