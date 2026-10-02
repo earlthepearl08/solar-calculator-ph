@@ -1829,6 +1829,40 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Always keep a local copy so a failed send never loses the lead.
                 persistLeadLocally(customerInfo, results);
 
+                // Durable store: append to Google Sheet via /api/lead (non-blocking for EmailJS).
+                // EmailJS remains the email notify path; Sheet is the CRM source of truth.
+                const leadPayload = {
+                    name: customerInfo.name,
+                    email: customerInfo.email,
+                    phone: customerInfo.phone || '',
+                    location: customerInfo.location || '',
+                    timeframe: customerInfo.timeframe || '',
+                    budget: customerInfo.budget || '',
+                    channel: customerInfo.channel || 'Any',
+                    systemCapacity: results.systemCapacity != null ? Number(results.systemCapacity).toFixed(2) : '',
+                    systemType: results.type || '',
+                    projectScale: results.scale || '',
+                    monthlyBill: results.monthlyBill != null ? results.monthlyBill : '',
+                    monthlySavings: results.monthlySavings != null ? Math.round(results.monthlySavings) : '',
+                    paybackYears: results.paybackYears != null ? Number(results.paybackYears).toFixed(1) : '',
+                    systemCost: formatPHPRange(results.estimatedSystemCostLow || 0, results.estimatedSystemCostHigh || 0),
+                    status: 'new',
+                    notes: ''
+                };
+                try {
+                    const leadRes = await fetch('/api/lead', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(leadPayload)
+                    });
+                    if (!leadRes.ok) {
+                        const errBody = await leadRes.json().catch(() => ({}));
+                        console.warn('Lead Sheet save failed:', leadRes.status, errBody.error || '');
+                    }
+                } catch (err) {
+                    console.warn('Lead Sheet save unreachable:', err && err.message);
+                }
+
                 const emailReady = window.emailjs && EMAILJS_CONFIG.publicKey !== 'YOUR_PUBLIC_KEY';
                 const notifyReady = emailReady && !!EMAILJS_CONFIG.notifyEmail;
                 let delivered = false;
@@ -1849,7 +1883,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         delivered = true;
                     } catch (err) { console.error('Customer report email failed:', err); }
                 } else {
-                    console.warn('EmailJS not configured. Lead saved locally only.');
+                    console.warn('EmailJS not configured. Lead saved locally / Sheet only.');
                     console.log('Lead:', customerInfo.name, notifyParams);
                     delivered = true; // treat as handled in dev / unconfigured environments
                 }

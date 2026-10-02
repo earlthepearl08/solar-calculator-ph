@@ -4,6 +4,12 @@
     "functions": {
         "api/extract-bill.js": {
             "maxDuration": 60
+        },
+        "api/lead.js": {
+            "maxDuration": 15
+        },
+        "api/leads.js": {
+            "maxDuration": 20
         }
     }
 }
