@@ -37,7 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     const DEFAULT_PSH = 4.3;
     const EFFICIENCY = 0.80;
-    const PANEL_SIZE_SQM = 3.0;
+    const PANEL_SIZE_SQM = 2.1; // usable footprint incl. spacing (modern ~2.0–2.2 m² modules)
     const SYSTEM_LIFESPAN_YEARS = 25;
     const DAYS_PER_MONTH = 30;
     const OFFGRID_DESIGN_FACTOR = 1.25;
@@ -438,8 +438,10 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentShift = 1;
     let lastSubmitTime = 0;
 
+    // Battery unit sizes used by findOptimalBattery — aligned with equipment-config.js
+    // Residential: 16.08 kWh LiFePO4 modules; C&I / Utility keep larger rack options.
     const batteryOptionsMap = {
-        'Residential': { '5kWh': 5, '10kWh': 10, '15kWh': 15 },
+        'Residential': { '16kWh LiFePO4': 16.08 },
         'C&I': { '100kWh': 100, '215kWh': 215, '1MWh': 1000 },
         'Utility Scale': { '215kWh': 215, '1MWh': 1000 }
     };
@@ -458,10 +460,11 @@ document.addEventListener('DOMContentLoaded', () => {
         genCharge: '5.5'
     };
 
-    // Daytime-load handling: Residential uses a fixed hidden default; C&I / Utility
-    // derive the daytime split from the selected operating shift (which sets the slider).
+    // Daytime-load handling: Residential uses usage-pattern buttons (Mostly day / Mixed /
+    // Mostly night); C&I / Utility derive the daytime split from operating shifts.
     const SHIFT_DAYTIME_MAP = { 1: 85, 2: 55, 3: 40 };
     const RESIDENTIAL_DAYTIME_DEFAULT = 40;
+    const RESIDENTIAL_USAGE_MAP = { day: 70, mixed: 40, night: 25 };
 
     function setDaytimeSlider(v) {
         if (!elements.daytimeLoad) return;
@@ -479,15 +482,30 @@ document.addEventListener('DOMContentLoaded', () => {
     // Show/hide daytime-split + operating-shift inputs based on project scale,
     // and keep the effective daytime value in sync.
     function applyScaleVisibility(scale) {
+        const usageGroup = document.getElementById('usagePatternGroup');
         if (scale === 'Residential') {
             elements.daytimeLoadGroup.classList.add('hidden');
             elements.shiftGroup.classList.add('hidden');
-            setDaytimeSlider(RESIDENTIAL_DAYTIME_DEFAULT);
+            if (usageGroup) usageGroup.classList.remove('hidden');
+            // Keep current residential pattern unless slider was never set.
+            const current = parseInt(elements.daytimeLoad.value, 10);
+            if (![70, 40, 25].includes(current)) setDaytimeSlider(RESIDENTIAL_DAYTIME_DEFAULT);
+            syncUsagePatternButtons(parseInt(elements.daytimeLoad.value, 10) || RESIDENTIAL_DAYTIME_DEFAULT);
         } else {
             elements.daytimeLoadGroup.classList.remove('hidden');
             elements.shiftGroup.classList.remove('hidden');
+            if (usageGroup) usageGroup.classList.add('hidden');
             setDaytimeFromShift(currentShift);
         }
+    }
+
+    function syncUsagePatternButtons(daytimePct) {
+        document.querySelectorAll('.usage-pattern-option').forEach(btn => {
+            const v = parseInt(btn.getAttribute('data-daytime'), 10);
+            const on = v === daytimePct;
+            btn.classList.toggle('selected', on);
+            btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+        });
     }
 
     // ==================== COST CALCULATION ====================
@@ -597,7 +615,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const backupStorageNeeded = eveningHourlyLoad * backupHours;
 
         let optimalBattery;
-        if (type === 'Off-Grid') {
+        if (type === 'Grid-Tied') {
+            // Grid-tied has no storage in the costed design — skip battery sizing.
+            optimalBattery = { unitKwh: 0, numUnits: 0, totalKwh: 0, label: '' };
+        } else if (type === 'Off-Grid') {
             // Off-grid must carry the full nighttime load until the sun returns.
             optimalBattery = findOptimalBattery(nighttimeLoadKwh / BATTERY_DOD, scale);
         } else if (type === 'Hybrid') {
@@ -1593,6 +1614,9 @@ document.addEventListener('DOMContentLoaded', () => {
             updateBatteryOptions();
             calculate();
             localStorage.removeItem('solarCalcState');
+            const bm = document.getElementById('businessMode');
+            if (bm) { bm.checked = false; applyBusinessMode(false); }
+            syncUsagePatternButtons(RESIDENTIAL_DAYTIME_DEFAULT);
         });
     }
 
@@ -1676,32 +1700,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnSubmitText = document.getElementById('btnSubmitText');
     const btnSubmitLoading = document.getElementById('btnSubmitLoading');
 
-    if (btnGetReport) {
-        btnGetReport.addEventListener('click', () => {
-            reportModal.classList.add('active');
-            document.body.style.overflow = 'hidden';
-        });
-    }
-
-    function closeModal() {
-        reportModal.classList.remove('active');
-        document.body.style.overflow = '';
-        reportForm.classList.remove('hidden');
-        reportSuccess.classList.add('hidden');
-        reportForm.reset();
-    }
-
-    if (modalClose) modalClose.addEventListener('click', closeModal);
-    if (btnCloseSuccess) btnCloseSuccess.addEventListener('click', closeModal);
-    reportModal?.addEventListener('click', (e) => { if (e.target === reportModal) closeModal(); });
-
     // ==================== LEAD CAPTURE HELPERS ====================
     const KINMO_MESSENGER_URL = 'https://www.facebook.com/messages/t/kinmopwcorporation';
 
     // Short, sales-ready summary of the current computed result — used for chat prefills.
     function buildLeadMessage(results) {
         const r = results || window.solarCalcResults || {};
-        const parts = ['Hi Kinmo PW! I used your Solar Feasibility Tool and would like a quote.'];
+        const parts = ['Hi Kinmo PW! I used your Solar Feasibility Tool and would like a free site assessment.'];
         if (r.systemCapacity) parts.push('System ~' + Number(r.systemCapacity).toFixed(2) + ' kWp ' + (r.type || ''));
         if (r.monthlyBill) parts.push('Bill ' + formatPHP(r.monthlyBill));
         if (r.monthlySavings) parts.push('Est. savings ' + formatPHP(r.monthlySavings) + '/mo');
@@ -1717,6 +1722,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 ts: new Date().toISOString(),
                 name: customerInfo.name, email: customerInfo.email,
                 phone: customerInfo.phone, location: customerInfo.location,
+                timeframe: customerInfo.timeframe, budget: customerInfo.budget,
+                channel: customerInfo.channel,
                 systemCapacity: r.systemCapacity, type: r.type, scale: r.scale,
                 monthlyBill: r.monthlyBill, monthlySavings: r.monthlySavings,
                 estimatedSystemCost: r.estimatedSystemCost, paybackYears: r.paybackYears, roi: r.roi
@@ -1736,6 +1743,32 @@ document.addEventListener('DOMContentLoaded', () => {
         // Viber deep links don't reliably accept prefilled text — keep the plain contact link.
     }
 
+    function openReportModal() {
+        if (!reportModal) return;
+        reportModal.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+
+    if (btnGetReport) {
+        btnGetReport.addEventListener('click', openReportModal);
+    }
+    const btnBookAssessment = document.getElementById('btnBookAssessment');
+    if (btnBookAssessment) {
+        btnBookAssessment.addEventListener('click', openReportModal);
+    }
+
+    function closeModal() {
+        reportModal.classList.remove('active');
+        document.body.style.overflow = '';
+        reportForm.classList.remove('hidden');
+        reportSuccess.classList.add('hidden');
+        reportForm.reset();
+    }
+
+    if (modalClose) modalClose.addEventListener('click', closeModal);
+    if (btnCloseSuccess) btnCloseSuccess.addEventListener('click', closeModal);
+    reportModal?.addEventListener('click', (e) => { if (e.target === reportModal) closeModal(); });
+
     if (reportForm) {
         reportForm.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -1749,7 +1782,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 name: document.getElementById('customerName').value,
                 email: document.getElementById('customerEmail').value,
                 phone: document.getElementById('customerPhone').value,
-                location: document.getElementById('customerLocation').value
+                location: document.getElementById('customerLocation').value,
+                timeframe: (document.getElementById('customerTimeframe') || {}).value || '',
+                budget: (document.getElementById('customerBudget') || {}).value || '',
+                channel: (document.getElementById('customerChannel') || {}).value || 'Any'
             };
 
             btnSubmitText.classList.add('hidden');
@@ -1762,6 +1798,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     to_name: customerInfo.name, to_email: customerInfo.email,
                     customer_phone: customerInfo.phone || 'Not provided',
                     customer_location: customerInfo.location || 'Not provided',
+                    lead_timeframe: customerInfo.timeframe || 'Not provided',
+                    lead_budget: customerInfo.budget || 'Not provided',
+                    lead_channel: customerInfo.channel || 'Any',
                     system_capacity: (results.systemCapacity || 0).toFixed(2) + ' kWp',
                     num_panels: results.numPanels || 0,
                     system_type: results.type || 'N/A',
@@ -1790,6 +1829,40 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Always keep a local copy so a failed send never loses the lead.
                 persistLeadLocally(customerInfo, results);
 
+                // Durable store: append to Google Sheet via /api/lead (non-blocking for EmailJS).
+                // EmailJS remains the email notify path; Sheet is the CRM source of truth.
+                const leadPayload = {
+                    name: customerInfo.name,
+                    email: customerInfo.email,
+                    phone: customerInfo.phone || '',
+                    location: customerInfo.location || '',
+                    timeframe: customerInfo.timeframe || '',
+                    budget: customerInfo.budget || '',
+                    channel: customerInfo.channel || 'Any',
+                    systemCapacity: results.systemCapacity != null ? Number(results.systemCapacity).toFixed(2) : '',
+                    systemType: results.type || '',
+                    projectScale: results.scale || '',
+                    monthlyBill: results.monthlyBill != null ? results.monthlyBill : '',
+                    monthlySavings: results.monthlySavings != null ? Math.round(results.monthlySavings) : '',
+                    paybackYears: results.paybackYears != null ? Number(results.paybackYears).toFixed(1) : '',
+                    systemCost: formatPHPRange(results.estimatedSystemCostLow || 0, results.estimatedSystemCostHigh || 0),
+                    status: 'new',
+                    notes: ''
+                };
+                try {
+                    const leadRes = await fetch('/api/lead', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(leadPayload)
+                    });
+                    if (!leadRes.ok) {
+                        const errBody = await leadRes.json().catch(() => ({}));
+                        console.warn('Lead Sheet save failed:', leadRes.status, errBody.error || '');
+                    }
+                } catch (err) {
+                    console.warn('Lead Sheet save unreachable:', err && err.message);
+                }
+
                 const emailReady = window.emailjs && EMAILJS_CONFIG.publicKey !== 'YOUR_PUBLIC_KEY';
                 const notifyReady = emailReady && !!EMAILJS_CONFIG.notifyEmail;
                 let delivered = false;
@@ -1810,7 +1883,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         delivered = true;
                     } catch (err) { console.error('Customer report email failed:', err); }
                 } else {
-                    console.warn('EmailJS not configured. Lead saved locally only.');
+                    console.warn('EmailJS not configured. Lead saved locally / Sheet only.');
                     console.log('Lead:', customerInfo.name, notifyParams);
                     delivered = true; // treat as handled in dev / unconfigured environments
                 }
@@ -1818,6 +1891,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (delivered) {
                     reportForm.classList.add('hidden');
                     reportSuccess.classList.remove('hidden');
+                    updateContactLinks();
                 } else {
                     // Total email failure — route the lead to sales via Messenger as a fallback.
                     const proceed = confirm('We had trouble sending your report by email. Tap OK to message the Kinmo team directly on Messenger with your details, or Cancel to try again.');
@@ -1844,13 +1918,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const wizardSteps = document.querySelectorAll('.wizard-step');
     const wizardDots = document.querySelectorAll('.wizard-dot');
     const wizardProgressBar = document.getElementById('wizardProgressBar');
-    const WIZ_TOTAL_STEPS = 5;
+    const WIZ_TOTAL_STEPS = 3;
     let wizCurrentStep = 1;
 
     const wizardState = {
         projectScale: 'Residential',
         systemType: 'Grid-Tied',
-        bill: 15000, rate: 13.5,
+        bill: 8000, rate: 12,
         area: 50, wattage: 620,
         solarTarget: 100, daytimeLoad: 40,
         backupHours: 4, enableNetMetering: false,
@@ -1859,114 +1933,53 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function openWizard() {
         if (!wizardModal) return;
-        // Pre-fill from current calculator values
-        wizardState.projectScale = elements.projectScale.value;
-        wizardState.systemType = elements.systemType.value;
-        wizardState.bill = parseFloat(elements.bill.value) || 15000;
-        wizardState.rate = parseFloat(elements.rate.value) || 13.5;
+        wizardState.projectScale = 'Residential';
+        wizardState.systemType = elements.systemType.value || 'Grid-Tied';
+        wizardState.bill = parseFloat(elements.bill.value) || 8000;
+        wizardState.rate = parseFloat(elements.rate.value) || 12;
         wizardState.region = (elements.region && elements.region.value) || 'metro_manila';
         wizardState.area = parseFloat(elements.area.value) || 50;
         wizardState.wattage = parseFloat(elements.wattage.value) || 620;
         wizardState.solarTarget = parseInt(elements.solarTarget.value) || 100;
-        wizardState.daytimeLoad = parseInt(elements.daytimeLoad.value) || 40;
+        wizardState.daytimeLoad = parseInt(elements.daytimeLoad.value) || RESIDENTIAL_DAYTIME_DEFAULT;
         wizardState.backupHours = parseInt(elements.backupHours.value) || 4;
         wizardState.enableNetMetering = elements.enableNetMetering.checked;
 
-        // Populate wizard inputs
         const wizBill = document.getElementById('wizBill');
         const wizRate = document.getElementById('wizRate');
         const wizRegion = document.getElementById('wizRegion');
         const wizRoofType = document.getElementById('wizRoofType');
         const wizArea = document.getElementById('wizArea');
-        const wizRecommendedArea = document.getElementById('wizRecommendedArea');
-        const wizWattage = document.getElementById('wizWattage');
-        const wizSolarTarget = document.getElementById('wizSolarTarget');
-        const wizDaytimeLoad = document.getElementById('wizDaytimeLoad');
-        const wizBackupHours = document.getElementById('wizBackupHours');
-        const wizNetMetering = document.getElementById('wizNetMetering');
 
-        // Update wizard roof type options based on scale
         if (wizRoofType) {
+            const opts = roofTypeAreas['Residential'];
             wizRoofType.innerHTML = '<option value="custom">I know my area</option>';
-            const opts = roofTypeAreas[wizardState.projectScale] || roofTypeAreas['Residential'];
-            const labels = {
-                bungalow: 'Bungalow', '2story': '2-Story House', townhouse: 'Townhouse', condo: 'Apartment / Condo',
-                small_commercial: 'Small Office / Shop', medium_commercial: 'Medium Building', warehouse: 'Large Building / Warehouse',
-                small_land: 'Open Land (Small)', large_land: 'Open Land (Large)'
-            };
+            const labels = { bungalow: 'Bungalow', '2story': '2-Story House', townhouse: 'Townhouse', condo: 'Apartment / Condo' };
             Object.entries(opts).forEach(([key, sqm]) => {
                 const opt = document.createElement('option');
                 opt.value = key;
                 opt.textContent = (labels[key] || key) + ' (~' + sqm + ' sqm)';
                 wizRoofType.appendChild(opt);
             });
-            wizRoofType.value = elements.roofType.value;
-            wizRoofType.addEventListener('change', () => {
-                if (wizRoofType.value !== 'custom') {
-                    const areaOpts = roofTypeAreas[wizardState.projectScale] || roofTypeAreas['Residential'];
-                    if (areaOpts[wizRoofType.value] && wizArea) {
-                        wizArea.value = areaOpts[wizRoofType.value];
-                    }
+            wizRoofType.onchange = () => {
+                if (wizRoofType.value !== 'custom' && opts[wizRoofType.value] && wizArea) {
+                    wizArea.value = opts[wizRoofType.value];
                 }
-            });
+            };
         }
 
         if (wizBill) wizBill.value = wizardState.bill;
         if (wizRate) wizRate.value = wizardState.rate;
-        if (wizRegion) wizRegion.value = wizardState.region || (elements.region ? elements.region.value : 'metro_manila');
+        if (wizRegion) wizRegion.value = wizardState.region;
         if (wizArea) wizArea.value = wizardState.area;
-        if (wizWattage) wizWattage.value = wizardState.wattage;
 
-        // Update wizard recommended area hint
-        function updateWizRecommendedArea() {
-            if (!wizRecommendedArea || !wizBill || !wizRate) return;
-            const bill = Math.max(0, parseFloat(wizBill.value) || 0);
-            const rate = Math.max(0.01, parseFloat(wizRate.value) || 1);
-            const target = parseInt(wizSolarTarget ? wizSolarTarget.value : 100) || 100;
-            const watt = Math.max(100, parseFloat(wizWattage ? wizWattage.value : 620) || 620);
-            const type = wizardState.systemType;
-            const psh = REGION_PSH[wizardState.region] || DEFAULT_PSH;
-            const dailyKwh = (bill / rate) / DAYS_PER_MONTH;
-            const targetDaily = dailyKwh * (target / 100);
-            const designFactor = type === 'Off-Grid' ? OFFGRID_DESIGN_FACTOR : 1.0;
-            const requiredKwp = (psh * EFFICIENCY > 0) ? (targetDaily / (psh * EFFICIENCY)) * designFactor : 0;
-            let panels = Math.ceil((requiredKwp * 1000) / watt) || 0;
-            panels = Math.ceil(panels / PANEL_ROUND_MULTIPLE) * PANEL_ROUND_MULTIPLE;
-            const neededArea = panels * PANEL_SIZE_SQM;
-            if (neededArea > 0) {
-                wizRecommendedArea.textContent = 'Recommended: ~' + neededArea.toFixed(0) + ' sqm for ' + target + '% coverage';
-            }
-        }
-        if (wizBill) wizBill.addEventListener('input', updateWizRecommendedArea);
-        if (wizRate) wizRate.addEventListener('input', updateWizRecommendedArea);
-        if (wizSolarTarget) wizSolarTarget.addEventListener('input', updateWizRecommendedArea);
-        if (wizWattage) wizWattage.addEventListener('input', updateWizRecommendedArea);
-        updateWizRecommendedArea();
-        if (wizSolarTarget) wizSolarTarget.value = wizardState.solarTarget;
-        if (wizDaytimeLoad) wizDaytimeLoad.value = wizardState.daytimeLoad;
-        if (wizBackupHours) wizBackupHours.value = wizardState.backupHours;
-        if (wizNetMetering) wizNetMetering.checked = wizardState.enableNetMetering;
-
-        // Update wizard slider labels
-        const wizSolarTargetVal = document.getElementById('wizSolarTargetVal');
-        const wizDaytimeLoadVal = document.getElementById('wizDaytimeLoadVal');
-        const wizBackupHoursVal = document.getElementById('wizBackupHoursVal');
-        if (wizSolarTargetVal) wizSolarTargetVal.textContent = wizardState.solarTarget;
-        if (wizDaytimeLoadVal) wizDaytimeLoadVal.textContent = wizardState.daytimeLoad;
-        if (wizBackupHoursVal) wizBackupHoursVal.textContent = wizardState.backupHours;
-
-        // Pre-select option buttons
         document.querySelectorAll('#wizStep1 .wizard-option').forEach(btn => {
-            btn.classList.toggle('selected', btn.getAttribute('data-value') === wizardState.projectScale);
-        });
-        document.querySelectorAll('#wizStep2 .wizard-option').forEach(btn => {
             btn.classList.toggle('selected', btn.getAttribute('data-value') === wizardState.systemType);
         });
 
-        wizCurrentStep = 1;
-        goToWizStep(1);
         wizardModal.classList.add('active');
         document.body.style.overflow = 'hidden';
+        goToWizStep(1);
     }
 
     function closeWizard() {
@@ -1984,16 +1997,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (i === n - 1) dot.classList.add('active');
         });
         if (wizardProgressBar) wizardProgressBar.style.setProperty('--wizard-progress', ((n / WIZ_TOTAL_STEPS) * 100) + '%');
+        const progressEl = document.querySelector('.wizard-progress');
+        if (progressEl) progressEl.setAttribute('aria-valuenow', String(n));
         if (wizPrev) wizPrev.disabled = n === 1;
         if (wizNext) wizNext.classList.toggle('hidden', n === WIZ_TOTAL_STEPS);
         if (wizFinish) wizFinish.classList.toggle('hidden', n !== WIZ_TOTAL_STEPS);
 
-        // Final step: generate the summary
-        if (n === WIZ_TOTAL_STEPS) {
-            generateWizardSummary();
-        }
+        if (n === WIZ_TOTAL_STEPS) generateWizardSummary();
 
-        // Focus first interactive element
         const activeStep = document.getElementById('wizStep' + n);
         if (activeStep) {
             const focusable = activeStep.querySelector('button, input, select, [tabindex]');
@@ -2006,23 +2017,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const wizRate = document.getElementById('wizRate');
         const wizRoofType = document.getElementById('wizRoofType');
         const wizArea = document.getElementById('wizArea');
-        const wizWattage = document.getElementById('wizWattage');
-        const wizSolarTarget = document.getElementById('wizSolarTarget');
-        const wizDaytimeLoad = document.getElementById('wizDaytimeLoad');
-        const wizBackupHours = document.getElementById('wizBackupHours');
-        const wizNetMetering = document.getElementById('wizNetMetering');
         const wizRegion = document.getElementById('wizRegion');
 
-        if (wizBill) wizardState.bill = parseFloat(wizBill.value) || 15000;
-        if (wizRate) wizardState.rate = parseFloat(wizRate.value) || 13.5;
+        if (wizBill) wizardState.bill = parseFloat(wizBill.value) || 8000;
+        if (wizRate) wizardState.rate = parseFloat(wizRate.value) || 12;
         if (wizRegion) wizardState.region = wizRegion.value;
         if (wizRoofType) wizardState.roofType = wizRoofType.value;
         if (wizArea) wizardState.area = parseFloat(wizArea.value) || 50;
-        if (wizWattage) wizardState.wattage = parseFloat(wizWattage.value) || 620;
-        if (wizSolarTarget) wizardState.solarTarget = parseInt(wizSolarTarget.value) || 100;
-        if (wizDaytimeLoad) wizardState.daytimeLoad = parseInt(wizDaytimeLoad.value) || 75;
-        if (wizBackupHours) wizardState.backupHours = parseInt(wizBackupHours.value) || 4;
-        if (wizNetMetering) wizardState.enableNetMetering = wizNetMetering.checked;
+        wizardState.projectScale = 'Residential';
+        wizardState.wattage = parseFloat(elements.wattage.value) || 620;
+        wizardState.solarTarget = parseInt(elements.solarTarget.value) || 100;
+        wizardState.daytimeLoad = parseInt(elements.daytimeLoad.value) || RESIDENTIAL_DAYTIME_DEFAULT;
+        wizardState.backupHours = parseInt(elements.backupHours.value) || 4;
+        wizardState.enableNetMetering = elements.enableNetMetering.checked;
     }
 
     function generateWizardSummary() {
@@ -2080,7 +2087,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function finishWizard() {
         readWizardInputs();
 
-        // Transfer values to main calculator
         elements.projectScale.value = wizardState.projectScale;
         elements.systemType.value = wizardState.systemType;
         elements.bill.value = wizardState.bill;
@@ -2095,8 +2101,8 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.backupHours.value = wizardState.backupHours;
         elements.enableNetMetering.checked = wizardState.enableNetMetering;
 
-        // Update UI visibility based on wizard selections
         applyScaleVisibility(wizardState.projectScale);
+        syncUsagePatternButtons(wizardState.daytimeLoad);
 
         if (wizardState.systemType === 'Off-Grid') {
             elements.offGridInfo.classList.remove('hidden');
@@ -2122,17 +2128,14 @@ document.addEventListener('DOMContentLoaded', () => {
             elements.genChargeGroup.classList.add('hidden');
         }
 
-        // Update slider visuals
         document.querySelectorAll('.sidebar input[type="range"]').forEach(updateRangeBackground);
         updateBatteryOptions();
         closeWizard();
         calculate();
-        // Land the user on their results instead of dumping them at the top of the page.
         const roiSection = document.querySelector('.roi-section');
         if (roiSection) setTimeout(() => roiSection.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
     }
 
-    // Wizard event listeners
     if (btnWizard) btnWizard.addEventListener('click', openWizard);
     if (wizardClose) wizardClose.addEventListener('click', closeWizard);
     if (wizardModal) wizardModal.addEventListener('click', (e) => { if (e.target === wizardModal) closeWizard(); });
@@ -2150,7 +2153,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (wizFinish) wizFinish.addEventListener('click', finishWizard);
 
-    // Wizard option buttons (steps 1-2)
+    const wizBookAssessment = document.getElementById('wizBookAssessment');
+    if (wizBookAssessment) {
+        wizBookAssessment.addEventListener('click', () => {
+            finishWizard();
+            openReportModal();
+        });
+    }
+
     document.querySelectorAll('.wizard-option').forEach(btn => {
         btn.addEventListener('click', () => {
             const field = btn.getAttribute('data-field');
@@ -2159,26 +2169,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 wizardState[field] = value;
                 btn.closest('.wizard-options').querySelectorAll('.wizard-option').forEach(b => b.classList.remove('selected'));
                 btn.classList.add('selected');
-                // Auto-advance after selection — long enough to see the choice highlight
-                // register before the step slides, so it doesn't feel like it "pops".
-                setTimeout(() => {
-                    readWizardInputs();
-                    if (wizCurrentStep < WIZ_TOTAL_STEPS) goToWizStep(wizCurrentStep + 1);
-                }, 450);
             }
         });
     });
 
-    // Wizard slider label sync
-    ['wizSolarTarget', 'wizDaytimeLoad', 'wizBackupHours'].forEach(id => {
-        const slider = document.getElementById(id);
-        const labelEl = document.getElementById(id + 'Val');
-        if (slider && labelEl) {
-            slider.addEventListener('input', () => { labelEl.textContent = slider.value; });
-        }
-    });
-
-    // Wizard keyboard: Escape to close
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && wizardModal && wizardModal.classList.contains('active')) {
             closeWizard();
@@ -2331,7 +2325,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 let json = {};
                 try { json = await resp.json(); } catch (e) { json = {}; }
                 if (!resp.ok || !json.ok) {
-                    throw new Error(json.error || 'Could not read the bill. Please enter your details manually.');
+                    const status = resp.status;
+                    let msg = json.error || 'Could not read the bill. Please enter your details manually.';
+                    if (status === 503) {
+                        msg = 'Automatic bill reading is not available right now. Enter your monthly bill (₱) and rate (₱/kWh) in the calculator — or try again later.';
+                    } else if (status === 429) {
+                        msg = 'Too many bill uploads just now. Wait a minute, or enter your bill and rate manually.';
+                    } else if (status === 403 || status === 404) {
+                        msg = 'Bill reading is unavailable in this environment. Enter your monthly bill and rate manually — the rest of the calculator still works.';
+                    } else if (!resp.ok && !json.error) {
+                        msg = 'We could not reach the bill reader. Enter your bill and rate manually to continue.';
+                    }
+                    throw new Error(msg);
                 }
                 const bills = (json.bills || []).filter(Boolean);
                 if (bills.length === 0) {
@@ -2340,7 +2345,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 renderConfirm(bills);
             } catch (err) {
                 showBillStep('upload');
-                showBillError(err.message || 'Something went wrong. Please enter your details manually.');
+                const friendly = (err && err.message) ? err.message : 'Something went wrong reading the bill.';
+                showBillError(friendly + ' You can close this and type your bill and rate in the inputs instead.');
             }
         }
 
@@ -2519,6 +2525,48 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const initScale = elements.projectScale.value;
     applyScaleVisibility(initScale);
+    syncUsagePatternButtons(parseInt(elements.daytimeLoad.value, 10) || RESIDENTIAL_DAYTIME_DEFAULT);
+
+    // Business / power-user mode: unlock C&I / Utility scale + advanced analysis
+    function applyBusinessMode(on) {
+        const scaleSelect = elements.projectScale;
+        Array.from(scaleSelect.options).forEach(opt => {
+            if (opt.value === 'C&I' || opt.value === 'Utility Scale') {
+                opt.hidden = !on;
+                opt.disabled = !on;
+            }
+        });
+        document.querySelectorAll('.power-user-only').forEach(el => {
+            el.classList.toggle('hidden', !on);
+        });
+        if (!on && scaleSelect.value !== 'Residential') {
+            scaleSelect.value = 'Residential';
+            applyScaleVisibility('Residential');
+            updateRoofTypeOptions();
+        }
+    }
+    const businessMode = document.getElementById('businessMode');
+    if (businessMode) {
+        const startBusiness = initScale !== 'Residential';
+        businessMode.checked = startBusiness;
+        applyBusinessMode(startBusiness);
+        businessMode.addEventListener('change', () => {
+            applyBusinessMode(businessMode.checked);
+            calculate();
+        });
+    } else {
+        applyBusinessMode(false);
+    }
+
+    // Residential usage pattern buttons
+    document.querySelectorAll('.usage-pattern-option').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const v = parseInt(btn.getAttribute('data-daytime'), 10);
+            setDaytimeSlider(v);
+            syncUsagePatternButtons(v);
+            calculate();
+        });
+    });
 
     const initType = elements.systemType.value;
     if (initType === 'Off-Grid') {
@@ -2557,14 +2605,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (isSampleScenario && sampleHint) {
         sampleHint.classList.remove('hidden');
-        // Hide the hint as soon as the user edits anything (real interactions dispatch
-        // input/change/click; our programmatic updates do not).
         const sidebarContent = document.querySelector('.sidebar-content');
         ['input', 'change'].forEach(ev => {
             if (sidebarContent) sidebarContent.addEventListener(ev, dismissSampleHint);
             if (wizardModal) wizardModal.addEventListener(ev, dismissSampleHint);
         });
-        document.querySelectorAll('.wizard-option').forEach(btn => btn.addEventListener('click', dismissSampleHint));
+        document.querySelectorAll('.wizard-option, .usage-pattern-option').forEach(btn => btn.addEventListener('click', dismissSampleHint));
+        const billBtns = [document.getElementById('btnUploadBillSidebar'), document.getElementById('btnUploadBillWizard')];
+        billBtns.forEach(b => { if (b) b.addEventListener('click', dismissSampleHint); });
     }
 
     // First visit: the pre-filled sample results render immediately so the visitor sees value

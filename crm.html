@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Kinmo PW — Leads CRM</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="crm.css">
+</head>
+<body>
+    <div id="loginView" class="login-view">
+        <div class="login-card">
+            <img src="logo.png" alt="Kinmo PW" class="login-logo" width="120" height="40">
+            <h1>Leads CRM</h1>
+            <p>Password-protected admin for Earl Dy / Kinmo PW.</p>
+            <form id="loginForm">
+                <label for="crmPassword">Admin password</label>
+                <input type="password" id="crmPassword" name="crmPassword" autocomplete="current-password" required placeholder="CRM password">
+                <button type="submit" class="btn-primary" id="loginBtn">Sign in</button>
+                <p class="form-error hidden" id="loginError"></p>
+            </form>
+        </div>
+    </div>
+
+    <div id="appView" class="app-view hidden">
+        <header class="crm-header">
+            <div class="crm-brand">
+                <img src="logo.png" alt="Kinmo PW" width="100" height="34">
+                <div>
+                    <h1>Leads CRM</h1>
+                    <p class="crm-sub">Solar calculator inquiries</p>
+                </div>
+            </div>
+            <div class="crm-header-actions">
+                <button type="button" class="btn-ghost" id="btnRefresh">Refresh</button>
+                <button type="button" class="btn-ghost" id="btnLogout">Log out</button>
+            </div>
+        </header>
+
+        <section class="crm-toolbar">
+            <div class="filter-group" role="group" aria-label="Filter by status">
+                <button type="button" class="filter-chip active" data-status="">All</button>
+                <button type="button" class="filter-chip" data-status="new">New</button>
+                <button type="button" class="filter-chip" data-status="contacted">Contacted</button>
+                <button type="button" class="filter-chip" data-status="qualified">Qualified</button>
+                <button type="button" class="filter-chip" data-status="won">Won</button>
+                <button type="button" class="filter-chip" data-status="lost">Lost</button>
+            </div>
+            <p class="crm-count" id="leadCount">—</p>
+        </section>
+
+        <p class="crm-banner hidden" id="crmBanner" role="status"></p>
+
+        <div class="table-wrap">
+            <table class="leads-table" id="leadsTable">
+                <thead>
+                    <tr>
+                        <th>When</th>
+                        <th>Contact</th>
+                        <th>Qualifiers</th>
+                        <th>System</th>
+                        <th>Status</th>
+                        <th>Notes</th>
+                    </tr>
+                </thead>
+                <tbody id="leadsBody">
+                    <tr class="empty-row"><td colspan="6">Sign in to load leads.</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="crm.js"></script>
+</body>
+</html>
